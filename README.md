@@ -283,6 +283,16 @@ Each backend executable has `src/main/resources/application.properties`.
 - No Spring profiles, environment-specific property files, secret store, or feature-flag mechanism was found.
 - `spring.ai.mcp.server.veersion` is misspelled and likely ignored.
 
+### Database migration strategy
+
+Flyway owns versioned PostgreSQL schema evolution. The one shared migration source is `trade-repository/src/main/resources/db/migration`; the REST application runs it, while Batch and MCP use the resulting shared schema without running Flyway. Migration files are immutable and follow `V<version>__<description>.sql`.
+
+The current migration chain is `V1__extensions.sql`, `V2__spring_batch_schema.sql`, `V3__application_schema.sql`, and `V4__spring_ai_schema.sql`. It creates the `uuid-ossp` and pgvector (`vector`) extensions, Spring Batch metadata, business tables, and Spring AI/vector tables in dependency order. The next reserved migration is `V5__create_app_user.sql`.
+
+For a fresh PostgreSQL database, normal REST startup applies V1–V4 and records them in `flyway_schema_history`. For an existing populated database, first verify it matches the migration prerequisites, then start REST exactly once with the `flyway-baseline` profile. This records a Flyway baseline at version 4 without rerunning V1–V4 or modifying application data. Normal startup keeps `baseline-on-migrate=false`, validates history checksums, and disables Flyway clean.
+
+Future workflow: pull current migrations; never manually alter a shared schema; create and test the next migration; commit it with the code change; never edit an applied migration; and correct mistakes with a new versioned migration.
+
 ## Error handling and resilience
 
 REST exposes structured `ApiError` responses through `GlobalExceptionHandler`:

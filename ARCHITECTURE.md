@@ -201,7 +201,11 @@ Mutual-fund classes are plain Java objects rather than JPA entities. Their const
 
 ### Schema ownership
 
-No migration, Flyway, Liquibase, `schema.sql`, `data.sql`, or versioned SQL script exists in the tracked source tree. Hibernate mapping may create/validate nothing by default because no `spring.jpa.hibernate.ddl-auto` setting is declared. Actual database DDL, keys, indexes, defaults, and cascade rules require DBA/runtime confirmation.
+Flyway owns versioned business-schema evolution. The single source of migrations is `trade-repository/src/main/resources/db/migration`, packaged into the shared repository artifact; `trade-rest` is the only executable carrying Flyway dependencies and running migrations. Batch and MCP explicitly disable Flyway so all applications share one `flyway_schema_history` rather than competing histories/runners.
+
+`V1__extensions.sql` creates `uuid-ossp` and pgvector, `V2__spring_batch_schema.sql` creates Batch metadata and its Spring Batch 6.0.3 sequences, `V3__application_schema.sql` creates business tables, and `V4__spring_ai_schema.sql` creates chat-memory/vector objects. Batch and MCP disable both Spring Batch automatic schema initialization and generic SQL initialization; the V2 migration is the only schema creator for Batch metadata. No Spring AI PgVector/chat-memory starter, configuration, or automatic initializer is present, so V4 is likewise the sole schema creator for those exported objects.
+
+Existing populated schemas are adopted through the opt-in `flyway-baseline` REST profile at version 4 after pre-baseline verification. Normal migration startup has baselining disabled, checksum validation enabled, and destructive clean disabled. Hibernate has `ddl-auto=none` in REST, Batch, and MCP. The next migration version is reserved for `V5__create_app_user.sql`.
 
 ## 7. REST Architecture
 
@@ -468,8 +472,9 @@ MCP Average-Buy-Sell-Price-and-Count invocation
 | Port/address | port 8082 | no server-specific setting | `127.0.0.1:8081` |
 | DB URL | `jdbc:postgresql://localhost:5432/postgres` | same | same |
 | DB credentials | `${DB_USERNAME:postgres}`, `${DB_PASSWORD:password}` | same | same |
-| Batch settings | none | input paths, truncate, recursion, chunk/skip, Batch schema init | Batch schema init set though this application does not launch jobs |
+| Batch settings | none | input paths, truncate, recursion, chunk/skip; Batch schema initialization disabled | Batch schema initialization disabled |
 | MCP settings | none | none | server name/type/endpoints/resource capability |
+| Flyway | enabled; applies shared V1–V4 migrations and one-time baseline profile | disabled | disabled |
 
 Configuration enters batch/MCP code through `@Value` fields. `spring.sql.init.mode=always` is configured in batch/MCP but no local SQL initialization script was found. The documented `batch.csv.error-file`, archived-file equivalents, and some configuration fields are not read by implementation code.
 
