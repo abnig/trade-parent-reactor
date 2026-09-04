@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import com.trading.model.MutualFundValue;
 import com.trading.repository.MutualFundValueRepository;
+import com.trading.repository.PageRequest;
 
 @Repository
 public class MutualFundValueRepositoryImpl implements MutualFundValueRepository {
@@ -46,7 +47,7 @@ public class MutualFundValueRepositoryImpl implements MutualFundValueRepository 
 
     // READ - Find all
     @Override
-	public List<MutualFundValue> findAll() {
+	public List<MutualFundValue> findAll(PageRequest pageRequest) {
 
         String sql = """
                 SELECT val_id,
@@ -55,9 +56,15 @@ public class MutualFundValueRepositoryImpl implements MutualFundValueRepository 
                        value_as_of_date
                 FROM mutual_fund_value
                 ORDER BY val_id
+                LIMIT ? OFFSET ?
                 """;
 
-        return jdbcTemplate.query(sql, this::mapRow);
+        return jdbcTemplate.query(sql, this::mapRow, pageRequest.size(), pageRequest.offset());
+    }
+
+    @Override
+    public long count() {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM mutual_fund_value", Long.class);
     }
 
     // READ - Find by ID
@@ -82,7 +89,7 @@ public class MutualFundValueRepositoryImpl implements MutualFundValueRepository 
 
     // READ - Find values for a mutual fund
     @Override
-	public List<MutualFundValue> findByMutualFundId(Long mutualFundId) {
+	public List<MutualFundValue> findByMutualFundId(Long mutualFundId, PageRequest pageRequest) {
 
         String sql = """
                 SELECT val_id,
@@ -91,14 +98,23 @@ public class MutualFundValueRepositoryImpl implements MutualFundValueRepository 
                        value_as_of_date
                 FROM mutual_fund_value
                 WHERE mutual_fund_id = ?
-                ORDER BY value_as_of_date DESC
+                ORDER BY value_as_of_date DESC, val_id
+                LIMIT ? OFFSET ?
                 """;
 
         return jdbcTemplate.query(
                 sql,
                 this::mapRow,
-                mutualFundId
+                mutualFundId,
+                pageRequest.size(),
+                pageRequest.offset()
         );
+    }
+
+    @Override
+    public long countByMutualFundId(Long mutualFundId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mutual_fund_value WHERE mutual_fund_id = ?", Long.class, mutualFundId);
     }
 
     // UPDATE

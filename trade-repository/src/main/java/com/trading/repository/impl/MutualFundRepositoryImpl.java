@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import com.trading.model.MutualFund;
 import com.trading.repository.MutualFundRepository;
+import com.trading.repository.PageRequest;
 
 @Repository
 public class MutualFundRepositoryImpl implements MutualFundRepository {
@@ -43,7 +44,7 @@ public class MutualFundRepositoryImpl implements MutualFundRepository {
 
     // READ - Find all
     @Override
-	public List<MutualFund> findAll() {
+	public List<MutualFund> findAll(PageRequest pageRequest) {
 
         String sql = """
                 SELECT mutual_fund_id,
@@ -53,9 +54,15 @@ public class MutualFundRepositoryImpl implements MutualFundRepository {
                        update_date
                 FROM mutual_fund
                 ORDER BY mutual_fund_id
+                LIMIT ? OFFSET ?
                 """;
 
-        return jdbcTemplate.query(sql, this::mapRow);
+        return jdbcTemplate.query(sql, this::mapRow, pageRequest.size(), pageRequest.offset());
+    }
+
+    @Override
+    public long count() {
+        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM mutual_fund", Long.class);
     }
 
     // READ - Find by ID
@@ -81,7 +88,7 @@ public class MutualFundRepositoryImpl implements MutualFundRepository {
 
     // READ - Find by Broker Account
     @Override
-	public List<MutualFund> findByBrokerAccountId(Long brokerAccountId) {
+	public List<MutualFund> findByBrokerAccountId(Long brokerAccountId, PageRequest pageRequest) {
 
         String sql = """
                 SELECT mutual_fund_id,
@@ -92,13 +99,22 @@ public class MutualFundRepositoryImpl implements MutualFundRepository {
                 FROM mutual_fund
                 WHERE broker_account_id = ?
                 ORDER BY mutual_fund_id
+                LIMIT ? OFFSET ?
                 """;
 
         return jdbcTemplate.query(
                 sql,
                 this::mapRow,
-                brokerAccountId
+                brokerAccountId,
+                pageRequest.size(),
+                pageRequest.offset()
         );
+    }
+
+    @Override
+    public long countByBrokerAccountId(Long brokerAccountId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mutual_fund WHERE broker_account_id = ?", Long.class, brokerAccountId);
     }
 
     // UPDATE

@@ -10,13 +10,17 @@ public interface MutualFundValueRepository {
 	MutualFundValue save(MutualFundValue value);
 
 	// READ - Find all
-	List<MutualFundValue> findAll();
+	List<MutualFundValue> findAll(PageRequest pageRequest);
+
+	long count();
 
 	// READ - Find by ID
 	MutualFundValue findById(Long id);
 
 	// READ - Find values for a mutual fund
-	List<MutualFundValue> findByMutualFundId(Long mutualFundId);
+	List<MutualFundValue> findByMutualFundId(Long mutualFundId, PageRequest pageRequest);
+
+	long countByMutualFundId(Long mutualFundId);
 
 	// UPDATE
 	MutualFundValue update(MutualFundValue value);

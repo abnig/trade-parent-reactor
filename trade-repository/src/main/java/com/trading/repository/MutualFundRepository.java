@@ -10,13 +10,17 @@ public interface MutualFundRepository {
 	MutualFund save(MutualFund mutualFund);
 
 	// READ - Find all
-	List<MutualFund> findAll();
+	List<MutualFund> findAll(PageRequest pageRequest);
+
+	long count();
 
 	// READ - Find by ID
 	MutualFund findById(Long id);
 
 	// READ - Find by Broker Account
-	List<MutualFund> findByBrokerAccountId(Long brokerAccountId);
+	List<MutualFund> findByBrokerAccountId(Long brokerAccountId, PageRequest pageRequest);
+
+	long countByBrokerAccountId(Long brokerAccountId);
 
 	// UPDATE
 	MutualFund update(MutualFund mutualFund);

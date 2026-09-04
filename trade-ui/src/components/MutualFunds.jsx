@@ -1,520 +1,93 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import api from '../api/api'
+import Pagination from './Pagination'
 
-const empty = {
-  brokerAccountId: '',
-  mutualFundName: ''
-}
-
-const PAGE_SIZE_OPTIONS = [10, 15, 20, 25]
+const empty = { brokerAccountId: '', mutualFundName: '' }
+const initialPage = { page: 0, size: 20, totalPages: 0, totalElements: 0, first: true, last: true }
 
 export default function MutualFunds() {
   const [items, setItems] = useState([])
   const [brokers, setBrokers] = useState([])
+  const [paging, setPaging] = useState(initialPage)
+  const [selectedBrokerId, setSelectedBrokerId] = useState('')
   const [form, setForm] = useState(empty)
   const [editingId, setEditingId] = useState(null)
   const [showForm, setShowForm] = useState(false)
-
-  const [searchText, setSearchText] = useState('')
-  const [selectedBrokerId, setSelectedBrokerId] = useState('')
-
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
-
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
-
-  const load = async () => {
-    try {
-      setLoading(true)
-
-      const [funds, brokerAccounts] = await Promise.all([
-        api.mutualFunds.all(),
-        api.brokerAccounts.all()
-      ])
-
-      setItems(funds || [])
-      setBrokers(brokerAccounts || [])
-      setError('')
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
+    let active = true
+    const load = async () => {
+      try {
+        setLoading(true)
+        const response = selectedBrokerId
+          ? await api.mutualFunds.byBrokerAccount(selectedBrokerId, paging)
+          : await api.mutualFunds.all(paging)
+        if (!active) return
+        setItems(response.content)
+        setPaging(response)
+        setError('')
+      } catch (e) {
+        if (active) setError(e.message)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
     load()
+    return () => { active = false }
+  }, [paging.page, paging.size, selectedBrokerId, refreshKey])
+
+  useEffect(() => {
+    let active = true
+    api.brokerAccounts.all({ page: 0, size: 100 })
+      .then((response) => { if (active) setBrokers(response.content) })
+      .catch((e) => { if (active) setError(e.message) })
+    return () => { active = false }
   }, [])
 
-  const submit = async e => {
-    e.preventDefault()
+  const reload = () => setRefreshKey((key) => key + 1)
+  const reset = () => { setForm(empty); setEditingId(null); setShowForm(false) }
 
+  const submit = async (event) => {
+    event.preventDefault()
     try {
-      const data = {
-        brokerAccountId: Number(form.brokerAccountId),
-        mutualFundName: form.mutualFundName.trim()
-      }
-
-      if (editingId) {
-        await api.mutualFunds.update(editingId, {
-          ...data,
-          mutualFundId: editingId
-        })
-      } else {
-        await api.mutualFunds.create(data)
-      }
-
+      const data = { brokerAccountId: Number(form.brokerAccountId), mutualFundName: form.mutualFundName.trim() }
+      if (editingId) await api.mutualFunds.update(editingId, { ...data, mutualFundId: editingId })
+      else await api.mutualFunds.create(data)
       reset()
-      await load()
-    } catch (e) {
-      setError(e.message)
-    }
+      reload()
+    } catch (e) { setError(e.message) }
   }
 
-  const reset = () => {
-    setForm({ ...empty })
-    setEditingId(null)
-    setShowForm(false)
-  }
-
-  const edit = x => {
-    setForm({
-      brokerAccountId: String(x.brokerAccountId),
-      mutualFundName: x.mutualFundName || ''
-    })
-
-    setEditingId(x.mutualFundId)
-    setShowForm(true)
-    setError('')
-  }
-
-  const remove = async id => {
-    if (!confirm('Delete this mutual fund?')) {
-      return
-    }
-
+  const remove = async (id) => {
+    if (!window.confirm('Delete this mutual fund?')) return
     try {
       await api.mutualFunds.remove(id)
-      await load()
-
-      // Make sure the current page remains valid after deletion.
-      setCurrentPage(page => Math.max(1, page))
-    } catch (e) {
-      setError(e.message)
-    }
+      if (items.length === 1 && paging.page > 0) setPaging((current) => ({ ...current, page: current.page - 1 }))
+      else reload()
+    } catch (e) { setError(e.message) }
   }
 
-  const brokerName = id =>
-    brokers.find(
-      b => String(b.id) === String(id)
-    )?.brokerName || `Broker #${id}`
-
-  /*
-   * Filter funds by:
-   * 1. Mutual fund name
-   * 2. Broker account
-   */
-  const filteredItems = useMemo(() => {
-    const search = searchText.trim().toLowerCase()
-
-    return items.filter(item => {
-      const matchesSearch =
-        !search ||
-        (item.mutualFundName || '')
-          .toLowerCase()
-          .includes(search)
-
-      const matchesBroker =
-        !selectedBrokerId ||
-        String(item.brokerAccountId) === String(selectedBrokerId)
-
-      return matchesSearch && matchesBroker
-    })
-  }, [items, searchText, selectedBrokerId])
-
-  /*
-   * Calculate pagination.
-   */
-  const totalItems = filteredItems.length
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(totalItems / pageSize)
-  )
-
-  /*
-   * If filtering reduces the number of pages,
-   * move back to the last valid page.
-   */
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages)
-    }
-  }, [currentPage, totalPages])
-
-  /*
-   * Get only the records for the current page.
-   */
-  const paginatedItems = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize
-    const endIndex = startIndex + pageSize
-
-    return filteredItems.slice(startIndex, endIndex)
-  }, [filteredItems, currentPage, pageSize])
-
-  const startItem =
-    totalItems === 0
-      ? 0
-      : (currentPage - 1) * pageSize + 1
-
-  const endItem =
-    totalItems === 0
-      ? 0
-      : Math.min(currentPage * pageSize, totalItems)
-
-  /*
-   * Reset pagination when the filter changes.
-   */
-  const handleSearchChange = value => {
-    setSearchText(value)
-    setCurrentPage(1)
-  }
-
-  const handleBrokerChange = value => {
+  const selectBroker = (value) => {
     setSelectedBrokerId(value)
-    setCurrentPage(1)
+    setPaging((current) => ({ ...current, page: 0 }))
   }
 
-  const clearFilters = () => {
-    setSearchText('')
-    setSelectedBrokerId('')
-    setCurrentPage(1)
-  }
+  const brokerName = (id) => brokers.find((broker) => String(broker.id) === String(id))?.brokerName || `Broker #${id}`
 
-  const handlePageSizeChange = value => {
-    const newPageSize = Math.min(
-      Number(value),
-      25
-    )
-
-    setPageSize(newPageSize)
-    setCurrentPage(1)
-  }
-
-  /*
-   * Generate page numbers.
-   *
-   * Example:
-   * 1 2 3 4 5
-   */
-  const pageNumbers = Array.from(
-    { length: totalPages },
-    (_, index) => index + 1
-  )
-
-  return (
-    <section>
-      <div className="section-header">
-        <div>
-          <h2>Mutual Funds</h2>
-          <p>Manage funds linked to broker accounts.</p>
-        </div>
-
-        <button
-          className="primary"
-          onClick={() => {
-            reset()
-            setShowForm(true)
-          }}
-        >
-          + Add Mutual Fund
-        </button>
-      </div>
-
-      {error && (
-        <div className="error">
-          {error}
-        </div>
-      )}
-
-      {showForm && (
-        <form
-          className="form-card"
-          onSubmit={submit}
-        >
-          <div className="form-grid">
-            <label>
-              Broker Account
-
-              <select
-                required
-                value={form.brokerAccountId}
-                onChange={e =>
-                  setForm({
-                    ...form,
-                    brokerAccountId: e.target.value
-                  })
-                }
-              >
-                <option value="">
-                  Select account
-                </option>
-
-                {brokers.map(b => (
-                  <option
-                    key={b.id}
-                    value={b.id}
-                  >
-                    {b.brokerName} — {b.accountId}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Mutual Fund Name
-
-              <input
-                required
-                value={form.mutualFundName}
-                onChange={e =>
-                  setForm({
-                    ...form,
-                    mutualFundName: e.target.value
-                  })
-                }
-              />
-            </label>
-          </div>
-
-          <div className="form-actions">
-            <button
-              type="button"
-              className="secondary"
-              onClick={reset}
-            >
-              Cancel
-            </button>
-
-            <button
-              className="primary"
-              type="submit"
-            >
-              {editingId ? 'Update' : 'Create'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Filters */}
-      <div className="filter-card">
-        <div className="filter-field">
-          <label>Search Mutual Funds</label>
-
-          <input
-            type="text"
-            placeholder="Search by fund name..."
-            value={searchText}
-            onChange={e =>
-              handleSearchChange(e.target.value)
-            }
-          />
-        </div>
-
-        <div className="filter-field">
-          <label>Broker Account</label>
-
-          <select
-            value={selectedBrokerId}
-            onChange={e =>
-              handleBrokerChange(e.target.value)
-            }
-          >
-            <option value="">
-              All Broker Accounts
-            </option>
-
-            {brokers.map(b => (
-              <option
-                key={b.id}
-                value={b.id}
-              >
-                {b.brokerName} — {b.accountId}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="filter-actions">
-          <button
-            type="button"
-            className="secondary"
-            onClick={clearFilters}
-          >
-            Clear Filters
-          </button>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Broker</th>
-              <th>Mutual Fund</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {loading ? (
-              <tr>
-                <td
-                  colSpan="3"
-                  className="empty"
-                >
-                  Loading...
-                </td>
-              </tr>
-            ) : paginatedItems.length === 0 ? (
-              <tr>
-                <td
-                  colSpan="3"
-                  className="empty"
-                >
-                  {totalItems === 0
-                    ? 'No mutual funds found.'
-                    : 'No mutual funds found on this page.'}
-                </td>
-              </tr>
-            ) : (
-              paginatedItems.map(x => (
-                <tr
-                  key={x.mutualFundId}
-                >
-                  <td>
-                    {brokerName(
-                      x.brokerAccountId
-                    )}
-                  </td>
-
-                  <td>
-                    {x.mutualFundName}
-                  </td>
-
-                  <td>
-                    <div className="actions">
-                      <button
-                        onClick={() => edit(x)}
-                      >
-                        Edit
-                      </button>
-
-                      <button
-                        className="danger-text"
-                        onClick={() =>
-                          remove(
-                            x.mutualFundId
-                          )
-                        }
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {!loading && totalItems > 0 && (
-        <div className="pagination-container">
-          <div className="pagination-info">
-            Showing {startItem}–{endItem} of{' '}
-            {totalItems} funds
-          </div>
-
-          <div className="pagination-controls">
-            <button
-              className="pagination-button"
-              disabled={currentPage === 1}
-              onClick={() =>
-                setCurrentPage(
-                  page => Math.max(1, page - 1)
-                )
-              }
-            >
-              ‹ Previous
-            </button>
-
-            <div className="pagination-pages">
-              {pageNumbers.map(page => (
-                <button
-                  key={page}
-                  className={`pagination-button ${
-                    currentPage === page
-                      ? 'active'
-                      : ''
-                  }`}
-                  onClick={() =>
-                    setCurrentPage(page)
-                  }
-                >
-                  {page}
-                </button>
-              ))}
-            </div>
-
-            <button
-              className="pagination-button"
-              disabled={
-                currentPage === totalPages
-              }
-              onClick={() =>
-                setCurrentPage(
-                  page =>
-                    Math.min(
-                      totalPages,
-                      page + 1
-                    )
-                )
-              }
-            >
-              Next ›
-            </button>
-          </div>
-
-          <div className="page-size-control">
-            <label htmlFor="pageSize">
-              Rows per page
-            </label>
-
-            <select
-              id="pageSize"
-              value={pageSize}
-              onChange={e =>
-                handlePageSizeChange(
-                  e.target.value
-                )
-              }
-            >
-              {PAGE_SIZE_OPTIONS.map(size => (
-                <option
-                  key={size}
-                  value={size}
-                >
-                  {size}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      )}
-    </section>
-  )
+  return <section>
+    <div className="section-header"><div><h2>Mutual Funds</h2><p>Manage funds linked to broker accounts.</p></div><button className="primary" onClick={() => { reset(); setShowForm(true) }}>+ Add Mutual Fund</button></div>
+    {error && <div className="error">{error}</div>}
+    {showForm && <form className="form-card" onSubmit={submit}><div className="form-grid">
+      <label>Broker Account<select required value={form.brokerAccountId} onChange={e => setForm({ ...form, brokerAccountId: e.target.value })}><option value="">Select account</option>{brokers.map(b => <option key={b.id} value={b.id}>{b.brokerName} — {b.accountId}</option>)}</select></label>
+      <label>Mutual Fund Name<input required value={form.mutualFundName} onChange={e => setForm({ ...form, mutualFundName: e.target.value })} /></label>
+    </div><div className="form-actions"><button type="button" className="secondary" onClick={reset}>Cancel</button><button className="primary" type="submit">{editingId ? 'Update' : 'Create'}</button></div></form>}
+    <div className="filter-card"><label>Broker Account<select value={selectedBrokerId} onChange={e => selectBroker(e.target.value)}><option value="">All Broker Accounts</option>{brokers.map(b => <option key={b.id} value={b.id}>{b.brokerName} — {b.accountId}</option>)}</select></label>{selectedBrokerId && <button type="button" className="secondary clear-filter" onClick={() => selectBroker('')}>Clear Filter</button>}</div>
+    <div className="table-wrap"><table><thead><tr><th>Broker</th><th>Mutual Fund</th><th>Actions</th></tr></thead><tbody>
+      {loading ? <tr><td colSpan="3" className="empty">Loading...</td></tr> : items.length === 0 ? <tr><td colSpan="3" className="empty">No mutual funds found.</td></tr> : items.map((fund) => <tr key={fund.mutualFundId}><td>{brokerName(fund.brokerAccountId)}</td><td>{fund.mutualFundName}</td><td><div className="actions"><button onClick={() => { setForm({ brokerAccountId: String(fund.brokerAccountId), mutualFundName: fund.mutualFundName || '' }); setEditingId(fund.mutualFundId); setShowForm(true) }}>Edit</button><button className="danger-text" onClick={() => remove(fund.mutualFundId)}>Delete</button></div></td></tr>)}
+    </tbody></table></div>
+    {!loading && <Pagination {...paging} loading={loading} onPrevious={() => setPaging(c => ({ ...c, page: c.page - 1 }))} onNext={() => setPaging(c => ({ ...c, page: c.page + 1 }))} onSizeChange={(size) => setPaging(c => ({ ...c, page: 0, size }))} />}
+  </section>
 }

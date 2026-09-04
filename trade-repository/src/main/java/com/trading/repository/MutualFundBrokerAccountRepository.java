@@ -6,7 +6,9 @@ import com.trading.model.MutualFundBrokerAccount;
 
 public interface MutualFundBrokerAccountRepository {
 
-	List<MutualFundBrokerAccount> findAll();
+	List<MutualFundBrokerAccount> findAll(PageRequest pageRequest);
+
+	long count();
 
 	MutualFundBrokerAccount findById(Long id);
 

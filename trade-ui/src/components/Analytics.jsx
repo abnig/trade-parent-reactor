@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../api/api'
+import Pagination from './Pagination'
+
+const initialPage = { page: 0, size: 20, totalPages: 0, totalElements: 0, first: true, last: true }
 
 const formatValue = (value) =>
   Number(value).toLocaleString(undefined, {
@@ -30,6 +33,8 @@ export default function Analytics() {
   const [funds, setFunds] = useState([])
   const [values, setValues] = useState([])
   const [selectedFundId, setSelectedFundId] = useState('')
+  const [fundPaging, setFundPaging] = useState(initialPage)
+  const [historyComplete, setHistoryComplete] = useState(true)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -38,13 +43,10 @@ export default function Analytics() {
       try {
         setLoading(true)
 
-        const [fundData, valueData] = await Promise.all([
-          api.mutualFunds.all(),
-          api.values.all()
-        ])
+        const fundData = await api.mutualFunds.all(fundPaging)
 
-        setFunds(Array.isArray(fundData) ? fundData : [])
-        setValues(Array.isArray(valueData) ? valueData : [])
+        setFunds(fundData.content)
+        setFundPaging(fundData)
         setError('')
       } catch (e) {
         setError(e.message || 'Failed to load analytics data.')
@@ -54,7 +56,33 @@ export default function Analytics() {
     }
 
     load()
-  }, [])
+  }, [fundPaging.page, fundPaging.size])
+
+  useEffect(() => {
+    let active = true
+    if (!selectedFundId) {
+      setValues([])
+      setHistoryComplete(true)
+      return () => { active = false }
+    }
+
+    const loadHistory = async () => {
+      try {
+        setLoading(true)
+        const response = await api.values.byFund(selectedFundId, { page: 0, size: 100 })
+        if (!active) return
+        setValues(response.content)
+        setHistoryComplete(response.last)
+        setError('')
+      } catch (e) {
+        if (active) setError(e.message || 'Failed to load value history.')
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    loadHistory()
+    return () => { active = false }
+  }, [selectedFundId])
 
   const selectedFund = funds.find(
     (fund) =>
@@ -66,7 +94,7 @@ export default function Analytics() {
    * and sort them by Value As Of date ascending.
    */
   const chartData = useMemo(() => {
-    if (!selectedFundId) {
+    if (!selectedFundId || !historyComplete) {
       return []
     }
 
@@ -290,6 +318,12 @@ export default function Analytics() {
         </label>
       </div>
 
+      {!loading && <Pagination {...fundPaging}
+        onPrevious={() => setFundPaging((current) => ({ ...current, page: current.page - 1 }))}
+        onNext={() => setFundPaging((current) => ({ ...current, page: current.page + 1 }))}
+        onSizeChange={(size) => setFundPaging((current) => ({ ...current, page: 0, size }))}
+      />}
+
       {/* No fund selected */}
       {!selectedFundId ? (
         <div className="analytics-empty">
@@ -301,6 +335,12 @@ export default function Analytics() {
             Choose a mutual fund above
             to view its value history.
           </p>
+        </div>
+
+      ) : !historyComplete ? (
+        <div className="analytics-empty">
+          <h3>Complete value history is not available</h3>
+          <p>This fund has more than 100 valuation records. A dedicated backend history endpoint is needed before this chart can be rendered accurately.</p>
         </div>
 
       ) : chartData.length === 0 ? (

@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.trading.exception.GlobalExceptionHandler;
 import com.trading.model.MutualFund;
 import com.trading.repository.MutualFundRepository;
+import com.trading.repository.PageRequest;
 import com.trading.validation.MutualFundReferenceValidator;
 
 import org.springframework.context.annotation.Import;
@@ -77,7 +78,7 @@ class MutualFundControllerTest {
 
     @Test
     void hidesUnexpectedRepositoryFailures() throws Exception {
-        when(repository.findAll()).thenThrow(new RuntimeException("database detail"));
+        when(repository.findAll(new PageRequest(0, 20))).thenThrow(new RuntimeException("database detail"));
 
         mockMvc.perform(get("/api/mutual-funds"))
                 .andExpect(status().isInternalServerError())

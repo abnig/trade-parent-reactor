@@ -426,6 +426,13 @@ tbody tr:last-child td { border-bottom: 0; }
   gap: 4px;
 }
 
+.pagination-page {
+  min-width: 116px;
+  text-align: center;
+  color: #475569;
+  font-size: 13px;
+}
+
 .pagination-button {
   min-width: 36px;
   height: 36px;

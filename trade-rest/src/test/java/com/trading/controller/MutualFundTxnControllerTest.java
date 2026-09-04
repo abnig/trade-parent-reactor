@@ -2,6 +2,9 @@ package com.trading.controller;
 
 import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -17,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.trading.exception.GlobalExceptionHandler;
 import com.trading.exception.InvalidReferenceException;
 import com.trading.repository.MutualFundTxnRepository;
+import com.trading.model.result.TransactionSummary;
 import com.trading.validation.MutualFundReferenceValidator;
 
 @WebMvcTest(MutualFundTxnController.class)
@@ -63,6 +67,58 @@ class MutualFundTxnControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error", is("Invalid reference")))
                 .andExpect(jsonPath("$.message", is("Mutual fund 999 does not exist.")));
+    }
+
+    @Test
+    void returnsSummaryAcrossAllTransactionsWithoutPagination() throws Exception {
+        when(repository.getSummary()).thenReturn(new TransactionSummary(
+                new java.math.BigDecimal("125000.00"), new java.math.BigDecimal("845.75")));
+
+        mockMvc.perform(get("/api/mutual-fund-txns/summary?page=4&size=10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalValue", is(125000.00)))
+                .andExpect(jsonPath("$.totalUnits", is(845.75)));
+
+        verify(repository).getSummary();
+    }
+
+    @Test
+    void treatsZeroMutualFundIdAsAnUnfilteredSummary() throws Exception {
+        when(repository.getSummary()).thenReturn(new TransactionSummary(
+                new java.math.BigDecimal("125000.00"), new java.math.BigDecimal("845.75")));
+
+        mockMvc.perform(get("/api/mutual-fund-txns/summary?mutualFundId=0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalValue", is(125000.00)))
+                .andExpect(jsonPath("$.totalUnits", is(845.75)));
+
+        verify(repository).getSummary();
+    }
+
+    @Test
+    void returnsSummaryFilteredByMutualFund() throws Exception {
+        when(repository.getSummary(9L)).thenReturn(new TransactionSummary(
+                new java.math.BigDecimal("48000.00"), new java.math.BigDecimal("312.25")));
+
+        mockMvc.perform(get("/api/mutual-fund-txns/summary?mutualFundId=9"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalValue", is(48000.00)))
+                .andExpect(jsonPath("$.totalUnits", is(312.25)));
+
+        verify(repository).getSummary(9L);
+    }
+
+    @Test
+    void returnsZeroSummaryForNoMatchingTransactions() throws Exception {
+        when(repository.getSummary(999L)).thenReturn(new TransactionSummary(
+                java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO));
+
+        mockMvc.perform(get("/api/mutual-fund-txns/summary?mutualFundId=999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalValue", is(0)))
+                .andExpect(jsonPath("$.totalUnits", is(0)));
+
+        verify(repository).getSummary(999L);
     }
 
     private String validTransactionJson(String amount, String units, String avgPrice, String transactionType) {

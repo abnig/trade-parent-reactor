@@ -118,6 +118,7 @@ public class BatchConfiguration {
 		return tradeFileItemReader;
 	}
 
+	@SuppressWarnings("unused")
 	@Bean
 	public Tasklet truncateTradeTableTasklet() {
 		return (contribution, chunkContext) -> {

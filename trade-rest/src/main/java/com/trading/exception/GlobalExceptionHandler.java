@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 
+import com.trading.repository.InvalidPaginationException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -55,6 +57,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleInvalidReference(
             InvalidReferenceException exception, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, "Invalid reference", exception.getMessage(),
+                request, Map.of());
+    }
+
+    @ExceptionHandler(InvalidPaginationException.class)
+    public ResponseEntity<ApiError> handleInvalidPagination(
+            InvalidPaginationException exception, HttpServletRequest request) {
+        return error(HttpStatus.BAD_REQUEST, "Invalid pagination", exception.getMessage(),
                 request, Map.of());
     }
 

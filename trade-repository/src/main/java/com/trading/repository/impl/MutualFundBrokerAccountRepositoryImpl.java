@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import com.trading.model.MutualFundBrokerAccount;
 import com.trading.repository.MutualFundBrokerAccountRepository;
+import com.trading.repository.PageRequest;
 
 @Repository
 public class MutualFundBrokerAccountRepositoryImpl implements MutualFundBrokerAccountRepository {
@@ -19,13 +20,21 @@ public class MutualFundBrokerAccountRepositoryImpl implements MutualFundBrokerAc
     }
 
     @Override
-	public List<MutualFundBrokerAccount> findAll() {
+	public List<MutualFundBrokerAccount> findAll(PageRequest pageRequest) {
         String sql = """
             SELECT broker_account_id, broker_name, account_id, create_date, update_date
             FROM mutual_fund_broker_account
+            ORDER BY broker_account_id
+            LIMIT ? OFFSET ?
             """;
 
-        return jdbcTemplate.query(sql, this::mapRow);
+        return jdbcTemplate.query(sql, this::mapRow, pageRequest.size(), pageRequest.offset());
+    }
+
+    @Override
+    public long count() {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mutual_fund_broker_account", Long.class);
     }
 
     @Override

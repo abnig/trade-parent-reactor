@@ -8,7 +8,9 @@ import org.springframework.stereotype.Repository;
 
 import com.trading.model.MutualFundTxn;
 import com.trading.model.enums.TransactionType;
+import com.trading.model.result.TransactionSummary;
 import com.trading.repository.MutualFundTxnRepository;
+import com.trading.repository.PageRequest;
 
 @Repository
 public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
@@ -50,7 +52,7 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
 
 	// READ - Find all
 	@Override
-	public List<MutualFundTxn> findAll() {
+	public List<MutualFundTxn> findAll(PageRequest pageRequest) {
 
 		String sql = """
 				SELECT mutual_fund_txn_id,
@@ -62,9 +64,15 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
 				       txn_type
 				FROM mutual_fund_txn
 				ORDER BY mutual_fund_txn_id
+				LIMIT ? OFFSET ?
 				""";
 
-		return jdbcTemplate.query(sql, this::mapRow);
+		return jdbcTemplate.query(sql, this::mapRow, pageRequest.size(), pageRequest.offset());
+	}
+
+	@Override
+	public long count() {
+		return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM mutual_fund_txn", Long.class);
 	}
 
 	// READ - Find by ID
@@ -88,7 +96,7 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
 
 	// READ - Find transactions for a mutual fund
 	@Override
-	public List<MutualFundTxn> findByMutualFundId(Long mutualFundId) {
+	public List<MutualFundTxn> findByMutualFundId(Long mutualFundId, PageRequest pageRequest) {
 
 		String sql = """
 				SELECT mutual_fund_txn_id,
@@ -100,10 +108,38 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
 				       txn_type
 				FROM mutual_fund_txn
 				WHERE mutual_fund_id = ?
-				ORDER BY txn_date DESC
+				ORDER BY txn_date DESC, mutual_fund_txn_id
+				LIMIT ? OFFSET ?
 				""";
 
-		return jdbcTemplate.query(sql, this::mapRow, mutualFundId);
+		return jdbcTemplate.query(sql, this::mapRow, mutualFundId, pageRequest.size(), pageRequest.offset());
+	}
+
+	@Override
+	public long countByMutualFundId(Long mutualFundId) {
+		return jdbcTemplate.queryForObject(
+				"SELECT COUNT(*) FROM mutual_fund_txn WHERE mutual_fund_id = ?", Long.class, mutualFundId);
+	}
+
+	@Override
+	public TransactionSummary getSummary() {
+		String sql = """
+				SELECT COALESCE(SUM(amount), 0) AS total_value,
+				       COALESCE(SUM(units), 0) AS total_units
+				FROM mutual_fund_txn
+				""";
+		return jdbcTemplate.queryForObject(sql, this::mapSummaryRow);
+	}
+
+	@Override
+	public TransactionSummary getSummary(Long mutualFundId) {
+		String sql = """
+				SELECT COALESCE(SUM(amount), 0) AS total_value,
+				       COALESCE(SUM(units), 0) AS total_units
+				FROM mutual_fund_txn
+				WHERE mutual_fund_id = ?
+				""";
+		return jdbcTemplate.queryForObject(sql, this::mapSummaryRow, mutualFundId);
 	}
 
 	// UPDATE
@@ -171,5 +207,9 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
 		}
 
 		return txn;
+	}
+
+	private TransactionSummary mapSummaryRow(ResultSet rs, int rowNum) throws java.sql.SQLException {
+		return new TransactionSummary(rs.getBigDecimal("total_value"), rs.getBigDecimal("total_units"));
 	}
 }
