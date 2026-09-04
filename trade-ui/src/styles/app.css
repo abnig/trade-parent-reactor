@@ -1,0 +1,516 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #172033;
+  background: #f5f7fb;
+  font-synthesis: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+.app-shell { min-height: 100vh; }
+.topbar {
+  background: #162033;
+  color: white;
+  padding: 24px 40px;
+}
+.topbar h1 { margin: 3px 0 0; font-size: 27px; }
+.eyebrow { font-size: 11px; letter-spacing: .16em; opacity: .65; font-weight: 700; }
+.tabs {
+  background: white;
+  padding: 0 40px;
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #e4e8ef;
+  overflow-x: auto;
+}
+.tab {
+  border: 0;
+  background: transparent;
+  padding: 16px 18px;
+  color: #667085;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+}
+.tab.active { color: #162033; border-bottom-color: #162033; font-weight: 700; }
+.content { max-width: 1280px; margin: 0 auto; padding: 34px 40px 60px; }
+.section-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 22px; }
+.section-header h2 { margin: 0; font-size: 25px; }
+.section-header p { margin: 5px 0 0; color: #697386; }
+.primary, .secondary {
+  border: 0; border-radius: 8px; padding: 10px 15px; font-weight: 650;
+}
+.primary { background: #162033; color: white; }
+.primary:hover { opacity: .9; }
+.secondary { background: #edf0f5; color: #273247; }
+.form-card {
+  background: white; border: 1px solid #e2e7ef; border-radius: 12px;
+  padding: 22px; margin-bottom: 22px; box-shadow: 0 2px 7px rgba(20,30,50,.04);
+}
+.form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; font-weight: 650; color: #344054; }
+input, select {
+  width: 100%; border: 1px solid #ccd3df; border-radius: 7px; padding: 10px 11px;
+  color: #172033; background: white; outline: none;
+}
+input:focus, select:focus { border-color: #69778e; box-shadow: 0 0 0 3px rgba(105,119,142,.12); }
+.form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.table-wrap {
+  background: white; border: 1px solid #e2e7ef; border-radius: 12px;
+  overflow: auto; box-shadow: 0 2px 7px rgba(20,30,50,.04);
+}
+table { width: 100%; border-collapse: collapse; min-width: 760px; }
+th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid #edf0f4; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #667085; background: #fafbfc; }
+td { font-size: 14px; }
+tbody tr:last-child td { border-bottom: 0; }
+.actions { display: flex; gap: 12px; align-items: center; }
+.actions button { border: 0; background: transparent; padding: 0; color: #344054; }
+.actions button:hover { text-decoration: underline; }
+.danger-text { color: #b42318 !important; }
+.error { background: #fef3f2; color: #b42318; border: 1px solid #fecdca; padding: 12px 14px; border-radius: 8px; margin-bottom: 18px; }
+.empty { padding: 35px; text-align: center; color: #7a8496; }
+@media (max-width: 800px) {
+  .topbar { padding: 20px; }
+  .tabs { padding: 0 12px; }
+  .content { padding: 24px 16px 45px; }
+  .section-header { align-items: flex-start; flex-direction: column; }
+  .form-grid { grid-template-columns: 1fr; }
+}
+/* Fund Values listing filter */
+.filter-card {
+  background: white;
+  border: 1px solid #e2e7ef;
+  border-radius: 12px;
+  padding: 18px 22px;
+  margin-bottom: 22px;
+  display: flex;
+  align-items: flex-end;
+  gap: 15px;
+  box-shadow: 0 2px 7px rgba(20,30,50,.04);
+}
+.filter-card label {
+  width: 360px;
+}
+.clear-filter {
+  margin-bottom: 0;
+}
+@media (max-width: 800px) {
+  .filter-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filter-card label {
+    width: 100%;
+  }
+}
+
+/* =========================================================
+   Analytics Page
+   ========================================================= */
+
+.analytics-filter {
+  margin-bottom: 22px;
+}
+
+.analytics-filter label {
+  width: 420px;
+  max-width: 100%;
+}
+
+.analytics-filter select {
+  width: 100%;
+}
+
+
+/* =========================================================
+   Analytics Empty State
+   ========================================================= */
+
+.analytics-empty {
+  background: white;
+  border: 1px solid #e2e7ef;
+  border-radius: 12px;
+  padding: 45px 30px;
+  text-align: center;
+  color: #64748b;
+}
+
+.analytics-empty h3 {
+  margin: 0 0 8px;
+  color: #172033;
+  font-size: 20px;
+}
+
+.analytics-empty p {
+  margin: 0;
+}
+
+
+/* =========================================================
+   Analytics Chart Card
+   ========================================================= */
+
+.analytics-card {
+  background: white;
+  border: 1px solid #e2e7ef;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 7px rgba(20, 30, 50, 0.04);
+}
+
+.analytics-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.analytics-card-header h3 {
+  margin: 0 0 6px;
+  color: #172033;
+  font-size: 20px;
+}
+
+.analytics-card-header p {
+  margin: 0;
+  color: #64748b;
+}
+
+
+/* =========================================================
+   Analytics Summary
+   ========================================================= */
+
+.analytics-summary {
+  min-width: 150px;
+  text-align: right;
+}
+
+.analytics-summary span {
+  display: block;
+  color: #64748b;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.analytics-summary strong {
+  display: block;
+  color: #172033;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.analytics-summary small {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+
+/* =========================================================
+   Chart
+   ========================================================= */
+
+.analytics-chart-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.analytics-chart {
+  display: block;
+  width: 100%;
+  min-width: 700px;
+  height: auto;
+}
+
+
+/* Chart grid */
+
+.chart-grid-line {
+  stroke: #e7ebf1;
+  stroke-width: 1;
+}
+
+
+/* Chart axes */
+
+.chart-axis-line {
+  stroke: #94a3b8;
+  stroke-width: 1;
+}
+
+
+/* Axis labels */
+
+.chart-axis-text {
+  fill: #64748b;
+  font-size: 13px;
+}
+
+.chart-axis-title {
+  fill: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+
+/* Chart line */
+
+.chart-line {
+  stroke: #2563eb;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+
+/* Chart points */
+
+.chart-point {
+  fill: #2563eb;
+  stroke: white;
+  stroke-width: 2;
+  cursor: pointer;
+}
+
+.chart-point:hover {
+  r: 7;
+}
+
+
+/* =========================================================
+   Responsive Analytics Layout
+   ========================================================= */
+
+@media (max-width: 800px) {
+
+  .analytics-card {
+    padding: 18px;
+  }
+
+  .analytics-card-header {
+    flex-direction: column;
+  }
+
+  .analytics-summary {
+    text-align: left;
+  }
+
+  .analytics-filter label {
+    width: 100%;
+  }
+
+  .analytics-chart {
+    min-width: 620px;
+  }
+}
+
+
+@media (max-width: 500px) {
+
+  .analytics-card {
+    padding: 14px;
+  }
+
+  .analytics-chart {
+    min-width: 560px;
+  }
+
+  .analytics-empty {
+    padding: 35px 20px;
+  }
+}
+
+/* =========================================================
+   Transaction Summary
+   ========================================================= */
+
+.transaction-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+  padding: 18px 22px;
+  background: white;
+  border: 1px solid #e2e7ef;
+  border-radius: 12px;
+  box-shadow: 0 2px 7px rgba(20, 30, 50, 0.04);
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.summary-label {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.summary-item strong {
+  font-size: 18px;
+  color: #172033;
+}
+
+@media (max-width: 800px) {
+  .transaction-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mutual Funds Filters */
+
+.filter-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e7ef;
+  border-radius: 12px;
+  box-shadow: 0 2px 7px rgba(20, 30, 50, 0.04);
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-field label,
+.page-size-control label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.filter-actions {
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Pagination */
+
+.pagination-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 14px 18px;
+  background: #ffffff;
+  border: 1px solid #e2e7ef;
+  border-radius: 12px;
+}
+
+.pagination-info {
+  font-size: 13px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pagination-pages {
+  display: flex;
+  gap: 4px;
+}
+
+.pagination-button {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #d8dee8;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.pagination-button:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.pagination-button.active {
+  font-weight: 600;
+}
+
+.pagination-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.page-size-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.page-size-control select {
+  width: auto;
+  min-width: 70px;
+}
+
+/* Responsive */
+
+@media (max-width: 900px) {
+  .filter-card {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .filter-actions {
+    grid-column: 1 / -1;
+  }
+
+  .pagination-container {
+    flex-wrap: wrap;
+  }
+
+  .pagination-controls {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 600px) {
+  .filter-card {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-actions {
+    grid-column: auto;
+  }
+
+  .pagination-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pagination-info,
+  .page-size-control {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .pagination-controls {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .pagination-pages {
+    flex-shrink: 0;
+  }
+}
