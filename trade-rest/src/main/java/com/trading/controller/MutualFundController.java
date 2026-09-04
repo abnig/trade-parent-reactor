@@ -12,18 +12,27 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.validation.annotation.Validated;
 
 import com.trading.model.MutualFund;
 import com.trading.repository.MutualFundRepository;
+import com.trading.validation.MutualFundReferenceValidator;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 
 @RestController
+@Validated
 @RequestMapping("/api/mutual-funds")
 public class MutualFundController {
 
     private final MutualFundRepository repository;
+    private final MutualFundReferenceValidator referenceValidator;
 
-    public MutualFundController(MutualFundRepository repository) {
+    public MutualFundController(MutualFundRepository repository,
+                                MutualFundReferenceValidator referenceValidator) {
         this.repository = repository;
+        this.referenceValidator = referenceValidator;
     }
 
     @GetMapping
@@ -33,14 +42,14 @@ public class MutualFundController {
 
     @GetMapping("/{id}")
     public ResponseEntity<MutualFund> findById(
-            @PathVariable Long id) {
+            @PathVariable @Positive(message = "ID must be positive") Long id) {
 
         return ResponseEntity.ok(repository.findById(id));
     }
 
     @GetMapping("/broker-account/{brokerAccountId}")
     public ResponseEntity<List<MutualFund>> findByBrokerAccountId(
-            @PathVariable Long brokerAccountId) {
+            @PathVariable @Positive(message = "Broker account ID must be positive") Long brokerAccountId) {
 
         return ResponseEntity.ok(
                 repository.findByBrokerAccountId(brokerAccountId)
@@ -49,7 +58,9 @@ public class MutualFundController {
 
     @PostMapping
     public ResponseEntity<MutualFund> create(
-            @RequestBody MutualFund mutualFund) {
+            @Valid @RequestBody MutualFund mutualFund) {
+
+        referenceValidator.requireBrokerAccount(mutualFund.getBrokerAccountId());
 
         MutualFund savedFund = repository.save(mutualFund);
 
@@ -60,10 +71,11 @@ public class MutualFundController {
 
     @PutMapping("/{id}")
     public ResponseEntity<MutualFund> update(
-            @PathVariable Long id,
-            @RequestBody MutualFund mutualFund) {
+            @PathVariable @Positive(message = "ID must be positive") Long id,
+            @Valid @RequestBody MutualFund mutualFund) {
 
         mutualFund.setMutualFundId(id);
+        referenceValidator.requireBrokerAccount(mutualFund.getBrokerAccountId());
 
         MutualFund updatedFund = repository.update(mutualFund);
 
@@ -72,7 +84,7 @@ public class MutualFundController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
-            @PathVariable Long id) {
+            @PathVariable @Positive(message = "ID must be positive") Long id) {
 
         if (!repository.deleteById(id)) {
             return ResponseEntity.notFound().build();

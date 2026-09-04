@@ -3,11 +3,23 @@ package com.trading.model;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 public class MutualFundValue {
 
     private Long valId;
+
+    @NotNull(message = "Mutual fund ID is required")
+    @Positive(message = "Mutual fund ID must be positive")
     private Long mutualFundId;
+
+    @NotNull(message = "Total value is required")
+    @DecimalMin(value = "0.0", message = "Total value must not be negative")
     private BigDecimal totalValue;
+
+    @NotNull(message = "Value as-of date is required")
     private LocalDateTime valueAsOfDate;
 
     public MutualFundValue() {

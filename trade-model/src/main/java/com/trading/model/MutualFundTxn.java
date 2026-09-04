@@ -5,16 +5,36 @@ import java.time.LocalDateTime;
 
 import com.trading.model.enums.TransactionType;
 
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 public class MutualFundTxn {
 
     private Long mutualFundTxnId;
+
+    @NotNull(message = "Mutual fund ID is required")
+    @Positive(message = "Mutual fund ID must be positive")
     private Long mutualFundId;
+
+    @NotNull(message = "Amount is required")
+    @DecimalMin(value = "0.0", message = "Amount must not be negative")
     private BigDecimal amount;
+
+    @NotNull(message = "Units are required")
+    @DecimalMin(value = "0.0", message = "Units must not be negative")
     private BigDecimal units;
+
+    @NotNull(message = "Average price is required")
+    @DecimalMin(value = "0.0", message = "Average price must not be negative")
     private BigDecimal avgPrice;
     private LocalDateTime createDate;
     private LocalDateTime updateDate;
+
+    @NotNull(message = "Transaction date is required")
     private LocalDateTime txnDate;
+
+    @NotNull(message = "Transaction type is required")
     private TransactionType transactionType;
 
     public MutualFundTxn() {

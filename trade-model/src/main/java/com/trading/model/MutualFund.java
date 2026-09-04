@@ -2,10 +2,19 @@ package com.trading.model;
 
 import java.time.LocalDateTime;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+
 public class MutualFund {
 
     private Long mutualFundId;
+
+    @NotNull(message = "Broker account ID is required")
+    @Positive(message = "Broker account ID must be positive")
     private Long brokerAccountId;
+
+    @NotBlank(message = "Mutual fund name is required")
     private String mutualFundName;
     private LocalDateTime createDate;
     private LocalDateTime updateDate;
