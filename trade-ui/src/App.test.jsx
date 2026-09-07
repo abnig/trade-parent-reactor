@@ -43,3 +43,10 @@ test('clearing the user removes portfolio content', () => {
   assert.match(render({ user: { id: 1, username: 'alice' } }), /Broker Accounts/)
   assert.doesNotMatch(render({ user: null }), /Broker Accounts|alice|Logout|<table/)
 })
+
+
+test('analytics shows a fund selector without pagination controls', () => {
+  const html = render({ user: { id: 1, username: 'alice' }, activeTab: 'analytics' })
+  assert.match(html, /Select Mutual Fund/)
+  assert.doesNotMatch(html, /aria-label="Pagination"|Rows per page|Previous page|Next page/)
+})

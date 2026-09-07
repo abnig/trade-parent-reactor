@@ -52,3 +52,16 @@ test('expired data requests notify the UI and preserve the HTTP status', async (
   await assert.rejects(api.brokerAccounts.all(), error => error.status === 401)
   assert.equal(event.type, 'session-expired')
 })
+
+
+test('analytics loads complete arrays from dedicated endpoints without paging parameters', async (t) => {
+  const records = Array.from({ length: 150 }, (_, id) => ({ valId: id, mutualFundId: 1 }))
+  const urls = []
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    urls.push(url)
+    return new Response(JSON.stringify(records))
+  })
+  assert.deepEqual(await api.analytics.funds(), records)
+  assert.deepEqual(await api.analytics.valueHistory(1), records)
+  assert.deepEqual(urls, ['/api/analytics/funds', '/api/analytics/funds/1/values'])
+})

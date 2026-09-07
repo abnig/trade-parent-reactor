@@ -193,6 +193,42 @@ class SessionAndOwnershipTest {
         }
     }
 
+    @Test void analyticsReturnsAllOwnedFundsAndCompleteChronologicalHistory() throws Exception {
+        for (int i = 0; i < 105; i++) {
+            jdbc.update("INSERT INTO mutual_fund(broker_account_id,mutual_fund_name) VALUES(1,?)", "Extra " + i);
+            jdbc.update("INSERT INTO mutual_fund_value(mutual_fund_id,total_value,value_as_of_date) VALUES(1,?,?)",
+                    i, java.time.LocalDateTime.of(2020, 1, 1, 0, 0).plusDays(104 - i));
+        }
+        var session = login("alice");
+        mvc.perform(get("/api/analytics/funds").session(session)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(106))
+                .andExpect(jsonPath("$[0].brokerAccountId").value(1));
+        mvc.perform(get("/api/analytics/funds/1/values").session(session)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(106))
+                .andExpect(jsonPath("$[0].totalValue").value(104))
+                .andExpect(jsonPath("$[105].totalValue").value(15));
+        // Shared management endpoints retain their existing pagination contract.
+        mvc.perform(get("/api/mutual-funds").session(session)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(106)).andExpect(jsonPath("$.content.length()").value(20));
+        var bob = login("bob");
+        mvc.perform(get("/api/analytics/funds").session(bob)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].mutualFundId").value(2));
+    }
+
+    @Test void analyticsRequiresLoginAndHidesForeignUnknownAndUnassignedHistory() throws Exception {
+        mvc.perform(get("/api/analytics/funds")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/analytics/funds/1/values")).andExpect(status().isUnauthorized());
+        var session = login("alice");
+        for (long fundId : new long[]{2, 3, 999}) {
+            mvc.perform(get("/api/analytics/funds/" + fundId + "/values").session(session))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        }
+        mvc.perform(get("/api/analytics/funds/0/values").session(session)).andExpect(status().isBadRequest());
+        jdbc.update("DELETE FROM mutual_fund_value WHERE mutual_fund_id=1");
+        mvc.perform(get("/api/analytics/funds/1/values").session(session))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+    }
+
     @Test void registrationRemainsPublicButDoesNotLogUserIn() throws Exception {
         var session = new MockHttpSession();
         mvc.perform(secured(post("/api/auth/register").contentType("application/json")
