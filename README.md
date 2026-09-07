@@ -396,3 +396,110 @@ Coverage gaps include no database integration tests, batch tests, MCP tests, UI 
 8. Review the UI API layer and client-side transaction/chart calculations.
 9. Repair jar packaging and test-runner reliability before significant feature work.
 10. Address schema governance, batch idempotency/truncation semantics, and API authentication as operational priorities.
+
+### User registration
+
+`POST /api/auth/register` creates an enabled account, a profile, and a `ROLE_USER`
+assignment in one transaction. V5 creates the supplied authentication tables
+when absent and seeds `ROLE_USER`; existing tables must match that schema.
+
+```json
+{
+  "username": "alice",
+  "email": "alice@example.com",
+  "password": "a-long-password",
+  "firstName": "Alice",
+  "lastName": "Smith"
+}
+```
+
+Success returns HTTP 201 with `id`, `username`, `email`, and `roles`.
+Invalid input returns 400; duplicate username/email returns 409. Usernames are
+1–50 ASCII letters, digits, underscores, dots, or hyphens. Passwords must contain
+12–72 characters and at most 72 UTF-8 bytes; only a BCrypt hash is stored.
+Profile fields (`firstName`, `lastName`, `phoneNumber`, `avatarUrl`) are optional.
+Username/email uniqueness follows the supplied PostgreSQL constraints (case
+sensitive). Clients cannot choose roles or account flags. This endpoint creates
+accounts; it does not issue login tokens.
+
+### Login and private portfolios
+
+The public home page displays the header and Register/Login links. Trading views
+are mounted only after `GET /api/auth/me` confirms an authenticated session.
+Login restores the dashboard, and logout or an expired session removes its data.
+The frontend refreshes session state on window focus, periodically, and when
+another tab logs in or out. Passwords and authentication tokens are never stored
+in local storage.
+
+Browser API flow:
+
+1. `GET /api/auth/csrf` returns `token` and `headerName` for subsequent writes.
+2. `POST /api/auth/login` accepts form-encoded `username` and `password` plus the
+   CSRF header. Success returns 204 and uses an HttpOnly session cookie; invalid,
+   disabled, locked, or expired accounts return a generic 401 response.
+3. `GET /api/auth/me` returns the user ID, username, and roles, or 401.
+4. `POST /api/auth/logout` with a fresh CSRF header invalidates the session.
+
+All `/api/**` endpoints other than CSRF, login, and registration require login.
+CSRF protection applies to registration and all other write requests. The frontend
+obtains a fresh CSRF token before writes, including after login/logout. This uses
+[Spring Security's session and CSRF support](https://docs.spring.io/spring-security/reference/7.0/servlet/exploits/csrf.html).
+Use `SESSION_COOKIE_SECURE=true` when serving the application over HTTPS.
+
+#### Database setup while Flyway is disabled
+
+Flyway remains disabled. Before running the updated REST application:
+
+1. Apply `trade-repository/src/main/resources/db/migration/V5__create_app_user.sql`
+   if the matching authentication tables and `ROLE_USER` seed are not present.
+2. Apply `trade-repository/src/main/resources/db/migration/V6__portfolio_ownership.sql`
+   once to add the owner column and supporting indexes. The existing application
+   tables from V3 must already exist.
+3. Assign existing broker accounts to the correct users explicitly. For example,
+   adapt this parameterized SQL for each verified account/user pair:
+
+   ```sql
+   UPDATE mutual_fund_broker_account
+   SET owner_user_id = :verified_user_id
+   WHERE broker_account_id = :verified_broker_account_id
+     AND owner_user_id IS NULL;
+   ```
+
+No existing rows are assigned automatically. Unassigned accounts and their funds,
+transactions, and valuations are invisible to REST users. Newly created broker
+accounts receive the authenticated user's ID; client-supplied owner IDs are ignored.
+
+REST uses request-scoped owner-filtered repository implementations. Ownership is
+checked within SQL for reads, counts, summaries, inserts, updates, and deletes;
+changing a parent reference also requires ownership of the new parent. Unknown or
+foreign record IDs return 404 on direct reads/updates/deletes; filtered listings and
+summaries include only owned records. Invalid parent references return 400.
+Existing batch and MCP repository contracts are unchanged.
+
+Record which SQL scripts you applied manually. Before enabling Flyway later,
+reconcile the schema and migration history with those scripts; simply enabling it
+will not record manually executed migrations or resolve the earlier missing-history
+error.
+
+Verification commands:
+
+```bash
+mvn -pl trade-rest -am clean test
+npm --prefix trade-ui test
+npm --prefix trade-ui run build
+```
+
+Security integration tests use a disposable H2 database in PostgreSQL mode and
+exercise the real security filters and JDBC repositories with two owners and
+unassigned data. PostgreSQL's role-seed `ON CONFLICT` clause is omitted only in the
+H2 fixture. UI tests cover guest/authenticated rendering and authentication API
+requests; they are not a browser end-to-end test.
+
+### Analytics data
+
+Analytics uses `GET /api/analytics/funds` for the complete fund selector and
+`GET /api/analytics/funds/{fundId}/values` for the complete valuation history,
+ordered by date and valuation ID. Both return JSON arrays without pagination or
+record limits and restrict results to the authenticated owner. Foreign, unknown,
+or unassigned funds return an empty history. The management pages retain their
+existing paginated endpoints. No database migration is required for this change.

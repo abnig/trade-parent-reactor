@@ -1,11 +1,14 @@
 const request = async (url, options = {}) => {
-  const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    },
-    ...options
-  })
+  const method = (options.method || 'GET').toUpperCase()
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    // Obtain a fresh token after session rotation at login/logout as well as on first use.
+    const csrfResponse = await fetch('/api/auth/csrf', { credentials: 'same-origin', cache: 'no-store' })
+    if (!csrfResponse.ok) throw new Error('Unable to verify your session. Please refresh and try again.')
+    const csrf = await csrfResponse.json()
+    headers[csrf.headerName] = csrf.token
+  }
+  const response = await fetch(url, { ...options, method, headers, credentials: 'same-origin', cache: 'no-store' })
 
   if (!response.ok) {
     let message = `Request failed: ${response.status}`
@@ -15,7 +18,12 @@ const request = async (url, options = {}) => {
     } catch {
       // Ignore non-JSON error responses.
     }
-    throw new Error(message)
+    if (response.status === 401 && !url.startsWith('/api/auth/') && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('session-expired'))
+    }
+    const error = new Error(message)
+    error.status = response.status
+    throw error
   }
 
   if (response.status === 204) return null
@@ -37,6 +45,20 @@ const queryUrl = (path, parameters) => {
 }
 
 export const api = {
+  analytics: {
+    funds: () => request('/api/analytics/funds'),
+    valueHistory: (fundId) => request(`/api/analytics/funds/${encodeURIComponent(fundId)}/values`)
+  },
+  auth: {
+    register: (data) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+    me: () => request('/api/auth/me'),
+    login: (data) => request('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(data).toString()
+    }),
+    logout: () => request('/api/auth/logout', { method: 'POST' })
+  },
   brokerAccounts: {
     all: (paging) => request(pagedUrl('/api/broker-accounts', paging)),
     get: (id) => request(`/api/broker-accounts/${id}`),

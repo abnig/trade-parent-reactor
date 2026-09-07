@@ -47,11 +47,11 @@ public class MutualFundBrokerAccountController {
     public ResponseEntity<MutualFundBrokerAccount> create(
             @RequestBody MutualFundBrokerAccount account) {
 
-    	int savedAccount = mutualFundBrokerRepository.save(account);
+        mutualFundBrokerRepository.save(account);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(mutualFundBrokerRepository.findById((long) savedAccount));
+                .body(mutualFundBrokerRepository.findById(account.getId()));
     }
 
     @PutMapping("/{id}")
@@ -61,9 +61,9 @@ public class MutualFundBrokerAccountController {
 
         account.setId(id);
 
-        int updatedAccount = mutualFundBrokerRepository.update(account);
+        mutualFundBrokerRepository.update(account);
 
-        return ResponseEntity.ok(mutualFundBrokerRepository.findById((long) updatedAccount));
+        return ResponseEntity.ok(mutualFundBrokerRepository.findById(id));
     }
 
     @DeleteMapping("/{id}")

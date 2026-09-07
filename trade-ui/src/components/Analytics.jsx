@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../api/api'
-import Pagination from './Pagination'
 
-const initialPage = { page: 0, size: 20, totalPages: 0, totalElements: 0, first: true, last: true }
 
 const formatValue = (value) =>
   Number(value).toLocaleString(undefined, {
@@ -33,46 +31,45 @@ export default function Analytics() {
   const [funds, setFunds] = useState([])
   const [values, setValues] = useState([])
   const [selectedFundId, setSelectedFundId] = useState('')
-  const [fundPaging, setFundPaging] = useState(initialPage)
-  const [historyComplete, setHistoryComplete] = useState(true)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let active = true
     const load = async () => {
       try {
         setLoading(true)
 
-        const fundData = await api.mutualFunds.all(fundPaging)
+        const fundData = await api.analytics.funds()
+        if (!active) return
 
-        setFunds(fundData.content)
-        setFundPaging(fundData)
+        setFunds(fundData)
         setError('')
       } catch (e) {
-        setError(e.message || 'Failed to load analytics data.')
+        if (active) setError(e.message || 'Failed to load analytics data.')
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
     }
 
     load()
-  }, [fundPaging.page, fundPaging.size])
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     let active = true
     if (!selectedFundId) {
       setValues([])
-      setHistoryComplete(true)
       return () => { active = false }
     }
 
+    setValues([])
     const loadHistory = async () => {
       try {
         setLoading(true)
-        const response = await api.values.byFund(selectedFundId, { page: 0, size: 100 })
+        const response = await api.analytics.valueHistory(selectedFundId)
         if (!active) return
-        setValues(response.content)
-        setHistoryComplete(response.last)
+        setValues(response)
         setError('')
       } catch (e) {
         if (active) setError(e.message || 'Failed to load value history.')
@@ -94,7 +91,7 @@ export default function Analytics() {
    * and sort them by Value As Of date ascending.
    */
   const chartData = useMemo(() => {
-    if (!selectedFundId || !historyComplete) {
+    if (!selectedFundId) {
       return []
     }
 
@@ -152,13 +149,9 @@ export default function Analytics() {
       }
     }
 
-    const rawMin = Math.min(
-      ...chartData.map((item) => item.value)
-    )
+    const rawMin = chartData.reduce((min, item) => Math.min(min, item.value), Infinity)
 
-    const rawMax = Math.max(
-      ...chartData.map((item) => item.value)
-    )
+    const rawMax = chartData.reduce((max, item) => Math.max(max, item.value), -Infinity)
 
     const range = rawMax - rawMin
 
@@ -318,12 +311,6 @@ export default function Analytics() {
         </label>
       </div>
 
-      {!loading && <Pagination {...fundPaging}
-        onPrevious={() => setFundPaging((current) => ({ ...current, page: current.page - 1 }))}
-        onNext={() => setFundPaging((current) => ({ ...current, page: current.page + 1 }))}
-        onSizeChange={(size) => setFundPaging((current) => ({ ...current, page: 0, size }))}
-      />}
-
       {/* No fund selected */}
       {!selectedFundId ? (
         <div className="analytics-empty">
@@ -337,11 +324,11 @@ export default function Analytics() {
           </p>
         </div>
 
-      ) : !historyComplete ? (
-        <div className="analytics-empty">
-          <h3>Complete value history is not available</h3>
-          <p>This fund has more than 100 valuation records. A dedicated backend history endpoint is needed before this chart can be rendered accurately.</p>
-        </div>
+      ) : loading ? (
+        <div className="analytics-empty" role="status">Loading value history…</div>
+
+      ) : error ? (
+        <div className="analytics-empty">Value history could not be loaded. Please try again.</div>
 
       ) : chartData.length === 0 ? (
 
