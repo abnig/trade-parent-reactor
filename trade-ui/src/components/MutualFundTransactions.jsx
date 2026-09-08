@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import api from '../api/api'
 import Pagination from './Pagination'
+import { formatDisplayDate } from '../utils/date'
 
 const empty = { mutualFundId: '', transactionType: 'BUY', amount: '', units: '', avgPrice: '', txnDate: '' }
 const initialPage = { page: 0, size: 20, totalPages: 0, totalElements: 0, first: true, last: true }
@@ -134,5 +135,5 @@ export default function MutualFundTransactions() {
 function formatNumber(value) { return Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function formatCurrency(value) { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value ?? 0)) }
 function formatUnits(value) { return new Intl.NumberFormat('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 4 }).format(Number(value ?? 0)) }
-function formatDate(value) { return value ? new Date(value).toLocaleString() : '-' }
+function formatDate(value) { return formatDisplayDate(value) }
 function toInputDate(value) { return value ? new Date(value).toISOString().slice(0, 16) : '' }

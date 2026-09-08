@@ -23,6 +23,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RegistrationControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean UserRegistrationRepository repository;
+    @MockitoBean com.trading.recovery.PasswordRecoveryService recovery;
+    @MockitoBean com.trading.repository.PasswordRecoveryRepository recoveryRepository;
     private static final String BODY = """
         {"username":"alice","email":"alice@example.com","password":"a-long-password",
          "firstName":"Alice","roles":["ROLE_ADMIN"],"enabled":false}

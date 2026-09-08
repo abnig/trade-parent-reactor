@@ -18,7 +18,7 @@ const request = async (url, options = {}) => {
     } catch {
       // Ignore non-JSON error responses.
     }
-    if (response.status === 401 && !url.startsWith('/api/auth/') && typeof window !== 'undefined') {
+    if (response.status === 401 && (!url.startsWith('/api/auth/') || url.startsWith('/api/auth/profile')) && typeof window !== 'undefined') {
       window.dispatchEvent(new Event('session-expired'))
     }
     const error = new Error(message)
@@ -47,7 +47,23 @@ const queryUrl = (path, parameters) => {
 export const api = {
   analytics: {
     funds: () => request('/api/analytics/funds'),
-    valueHistory: (fundId) => request(`/api/analytics/funds/${encodeURIComponent(fundId)}/values`)
+    valueHistory: (fundId) => request(`/api/analytics/funds/${encodeURIComponent(fundId)}/values`),
+    transactionHistory: async (fundId) => {
+      const transactions = []
+      let page = 0
+      let response
+      do {
+        response = await request(pagedUrl(`/api/mutual-fund-txns/mutual-fund/${encodeURIComponent(fundId)}`, { page, size: 100 }))
+        transactions.push(...response.content)
+        page += 1
+      } while (page < response.totalPages)
+      return transactions
+    }
+  },
+  profile: {
+    get: () => request('/api/auth/profile'),
+    update: (data) => request('/api/auth/profile', { method: 'PUT', body: JSON.stringify(data) }),
+    questions: () => request('/api/auth/profile/hint-questions')
   },
   auth: {
     register: (data) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),

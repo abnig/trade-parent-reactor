@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../api/api'
+import { historyDate, investmentHistory } from './investmentHistory'
+import { formatDisplayDate } from '../utils/date'
 
 
 const formatValue = (value) =>
@@ -9,8 +11,14 @@ const formatValue = (value) =>
   })
 
 const formatDate = (value) => {
-  if (!value) return '-'
-  return new Date(value).toLocaleDateString()
+  return formatDisplayDate(value)
+}
+
+const datePart = (value) => String(value || '').slice(0, 10)
+
+const isWithinDateRange = (value, fromDate, toDate) => {
+  const date = datePart(value)
+  return (!fromDate || date >= fromDate) && (!toDate || date <= toDate)
 }
 
 const formatAxisValue = (value) => {
@@ -30,7 +38,10 @@ const formatAxisValue = (value) => {
 export default function Analytics() {
   const [funds, setFunds] = useState([])
   const [values, setValues] = useState([])
+  const [transactions, setTransactions] = useState([])
   const [selectedFundId, setSelectedFundId] = useState('')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -60,16 +71,24 @@ export default function Analytics() {
     let active = true
     if (!selectedFundId) {
       setValues([])
+      setTransactions([])
       return () => { active = false }
     }
 
     setValues([])
+    setTransactions([])
     const loadHistory = async () => {
       try {
         setLoading(true)
-        const response = await api.analytics.valueHistory(selectedFundId)
+        const [response, transactionData] = await Promise.all([
+          api.analytics.valueHistory(selectedFundId),
+          api.analytics.transactionHistory(selectedFundId)
+        ])
         if (!active) return
+        // Validate before displaying a potentially misleading comparison.
+        investmentHistory(transactionData, selectedFundId, [])
         setValues(response)
+        setTransactions(transactionData)
         setError('')
       } catch (e) {
         if (active) setError(e.message || 'Failed to load value history.')
@@ -102,19 +121,28 @@ export default function Analytics() {
       )
       .map((item) => ({
         ...item,
-        date: new Date(item.valueAsOfDate),
+        date: historyDate(item.valueAsOfDate),
         value: Number(item.totalValue)
       }))
       .filter(
         (item) =>
           !Number.isNaN(item.date.getTime()) &&
-          Number.isFinite(item.value)
+          Number.isFinite(item.value) &&
+          isWithinDateRange(item.valueAsOfDate, fromDate, toDate)
       )
       .sort(
         (a, b) =>
           a.date.getTime() - b.date.getTime()
       )
-  }, [values, selectedFundId])
+  }, [values, selectedFundId, fromDate, toDate])
+
+  const filteredTransactions = useMemo(() => transactions.filter((item) =>
+    isWithinDateRange(item.txnDate, fromDate, toDate)
+  ), [transactions, fromDate, toDate])
+
+  const investments = useMemo(() => investmentHistory(
+    filteredTransactions, selectedFundId, chartData.map(item => item.date)
+  ), [filteredTransactions, selectedFundId, chartData])
 
   /*
    * Calculate SVG chart coordinates.
@@ -144,14 +172,17 @@ export default function Analytics() {
         plotWidth,
         plotHeight,
         points: [],
+        investmentPoints: [],
         yTicks: [],
         xTicks: []
       }
     }
 
-    const rawMin = chartData.reduce((min, item) => Math.min(min, item.value), Infinity)
+    const rawMin = investments.reduce((min, item) => Math.min(min, item.invested),
+      chartData.reduce((min, item) => Math.min(min, item.value), Infinity))
 
-    const rawMax = chartData.reduce((max, item) => Math.max(max, item.value), -Infinity)
+    const rawMax = investments.reduce((max, item) => Math.max(max, item.invested),
+      chartData.reduce((max, item) => Math.max(max, item.value), -Infinity))
 
     const range = rawMax - rawMin
 
@@ -161,17 +192,17 @@ export default function Analytics() {
         : range * 0.1
 
     const minValue = Math.max(
-      0,
+      rawMin < 0 ? -Infinity : 0,
       rawMin - padding
     )
 
     const maxValue = rawMax + padding
 
     const minTime =
-      chartData[0].date.getTime()
+      investments[0].date.getTime()
 
     const maxTime =
-      chartData[chartData.length - 1].date.getTime()
+      investments[investments.length - 1].date.getTime()
 
     const timeRange =
       maxTime - minTime
@@ -189,8 +220,11 @@ export default function Analytics() {
         (maxValue - minValue)) *
         plotHeight
 
+    const investedByDate = new Map(investments.map(item => [item.date.getTime(), item.invested]))
+    const investmentPoints = investments.map(item => ({ ...item, x: x(item.date.getTime()), y: y(item.invested) }))
     const points = chartData.map((item) => ({
       ...item,
+      invested: investedByDate.get(item.date.getTime()),
       x: x(item.date.getTime()),
       y: y(item.value)
     }))
@@ -215,13 +249,13 @@ export default function Analytics() {
     const maxXTicks = 6
 
     const step =
-      chartData.length <= maxXTicks
+      investmentPoints.length <= maxXTicks
         ? 1
         : Math.ceil(
-            chartData.length / maxXTicks
+            investmentPoints.length / maxXTicks
           )
 
-    const xTicks = chartData
+    const xTicks = investmentPoints
       .map((item, index) => ({
         ...item,
         index
@@ -229,7 +263,7 @@ export default function Analytics() {
       .filter(
         (item, index) =>
           index % step === 0 ||
-          index === chartData.length - 1
+          index === investmentPoints.length - 1
       )
       .reduce((result, item) => {
         if (
@@ -251,10 +285,11 @@ export default function Analytics() {
       plotWidth,
       plotHeight,
       points,
+      investmentPoints,
       yTicks,
       xTicks
     }
-  }, [chartData])
+  }, [chartData, investments])
 
   const linePoints = chart.points
     .map(
@@ -262,6 +297,10 @@ export default function Analytics() {
         `${point.x},${point.y}`
     )
     .join(' ')
+
+  const investmentPath = chart.investmentPoints.map((point, index) =>
+    index === 0 ? `M ${point.x} ${point.y}` : `H ${point.x} V ${point.y}`
+  ).join(' ')
 
   return (
     <section>
@@ -309,7 +348,31 @@ export default function Analytics() {
             ))}
           </select>
         </label>
+        <label>
+          From date
+          <input
+            type="date"
+            value={fromDate}
+            max={toDate || undefined}
+            onChange={(event) => setFromDate(event.target.value)}
+            disabled={loading}
+          />
+        </label>
+        <label>
+          To date
+          <input
+            type="date"
+            value={toDate}
+            min={fromDate || undefined}
+            onChange={(event) => setToDate(event.target.value)}
+            disabled={loading}
+          />
+        </label>
       </div>
+
+      {fromDate && toDate && fromDate > toDate && (
+        <div className="error">From date must be on or before the to date.</div>
+      )}
 
       {/* No fund selected */}
       {!selectedFundId ? (
@@ -329,6 +392,12 @@ export default function Analytics() {
 
       ) : error ? (
         <div className="analytics-empty">Value history could not be loaded. Please try again.</div>
+
+      ) : fromDate && toDate && fromDate > toDate ? (
+        <div className="analytics-empty">
+          <h3>Invalid date range</h3>
+          <p>Choose a from date on or before the to date.</p>
+        </div>
 
       ) : chartData.length === 0 ? (
 
@@ -358,7 +427,7 @@ export default function Analytics() {
               </h3>
 
               <p>
-                Total value over time
+                Total value and cumulative net investment over time
               </p>
             </div>
 
@@ -385,13 +454,18 @@ export default function Analytics() {
             </div>
           </div>
 
+          <div className="chart-legend">
+            <span><i className="chart-value-swatch" />Total value</span>
+            <span><i className="chart-investment-swatch" />Cumulative net investment</span>
+          </div>
+          <p className="chart-explanation">Net investment = BUY amounts − SELL amounts. Hover over a value marker for the date, investment, and gain/loss.</p>
           <div className="analytics-chart-wrap">
 
             <svg
               className="analytics-chart"
               viewBox={`0 0 ${chart.width} ${chart.height}`}
               role="img"
-              aria-label={`Total value trend for ${
+              aria-label={`Total value and cumulative net investment trend for ${
                 selectedFund?.mutualFundName ||
                 'selected mutual fund'
               }`}
@@ -458,11 +532,19 @@ export default function Analytics() {
                 className="chart-axis-line"
               />
 
-              {/* X-axis dates */}
-              {chart.xTicks.map((tick) => (
+              {/* X-axis date grid, markers, and labels */}
+              {chart.xTicks.map((tick, index) => (
                 <g
                   key={`${tick.valId}-${tick.index}`}
                 >
+                  <line
+                    x1={tick.x}
+                    x2={tick.x}
+                    y1={chart.margin.top}
+                    y2={chart.height - chart.margin.bottom}
+                    className="chart-grid-line"
+                  />
+
                   <line
                     x1={tick.x}
                     x2={tick.x}
@@ -485,11 +567,15 @@ export default function Analytics() {
                       chart.margin.bottom +
                       28
                     }
-                    textAnchor="middle"
+                    textAnchor={
+                      chart.xTicks.length === 1 ? 'middle'
+                        : index === 0 ? 'start'
+                          : index === chart.xTicks.length - 1 ? 'end' : 'middle'
+                    }
                     className="chart-axis-text"
                   >
                     {formatDate(
-                      tick.valueAsOfDate
+                      tick.date
                     )}
                   </text>
                 </g>
@@ -505,6 +591,12 @@ export default function Analytics() {
               )}
 
               {/* Data points */}
+              <path d={investmentPath} fill="none" className="chart-investment-line" />
+              {chart.investmentPoints.map(point => (
+                <circle key={point.date.getTime()} cx={point.x} cy={point.y} r="3" fill="black">
+                  <title>{formatDate(point.date)}: Net investment {formatValue(point.invested)}</title>
+                </circle>
+              ))}
               {chart.points.map((point) => (
                 <circle
                   key={point.valId}
@@ -518,9 +610,9 @@ export default function Analytics() {
                       point.valueAsOfDate
                     )}
                     :{' '}
-                    {formatValue(
-                      point.value
-                    )}
+                    Total value {formatValue(point.value)}
+                    {'; Net investment '}{formatValue(point.invested)}
+                    {'; Gain/loss '}{formatValue(point.value - point.invested)}
                   </title>
                 </circle>
               ))}

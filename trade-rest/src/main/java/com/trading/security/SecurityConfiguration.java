@@ -25,12 +25,16 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, com.trading.repository.PasswordRecoveryRepository recovery) throws Exception {
         return http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/csrf", "/api/auth/register", "/api/auth/login").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/auth/recovery/questions").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/password-reset/challenges",
+                    "/api/auth/password-reset/verify", "/api/auth/password-reset/complete").permitAll()
                 .requestMatchers("/api/**", "/actuator/**").authenticated()
                 .anyRequest().permitAll())
+            .addFilterBefore(new CredentialVersionFilter(recovery), org.springframework.security.web.access.intercept.AuthorizationFilter.class)
             .requestCache(cache -> cache.requestCache(new NullRequestCache()))
             .exceptionHandling(errors -> errors
                 .authenticationEntryPoint((request, response, exception) ->

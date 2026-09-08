@@ -123,11 +123,12 @@ tbody tr:last-child td { border-bottom: 0; }
 }
 
 .analytics-filter label {
-  width: 420px;
+  width: 220px;
   max-width: 100%;
 }
 
-.analytics-filter select {
+.analytics-filter select,
+.analytics-filter input {
   width: 100%;
 }
 
@@ -273,6 +274,41 @@ tbody tr:last-child td { border-bottom: 0; }
   stroke-width: 3;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.chart-investment-line {
+  stroke: #000;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  font-size: 14px;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-legend i {
+  display: inline-block;
+  width: 24px;
+  border-top: 3px solid #000;
+}
+
+.chart-legend .chart-value-swatch {
+  border-color: #2563eb;
+}
+
+.chart-explanation {
+  color: #64748b;
+  font-size: 13px;
+  margin-bottom: 16px;
 }
 
 
@@ -540,3 +576,6 @@ tbody tr:last-child td { border-bottom: 0; }
 .header-logout { background: transparent; border: 1px solid #a1aabb; color: white; border-radius: 6px; padding: 8px 14px; }
 .header-logout:focus-visible { outline: 2px solid white; outline-offset: 3px; }
 .header-logout:disabled { cursor: wait; opacity: .65; }
+
+.profile-hint-toggle { display: flex; align-items: center; gap: 10px; }
+.profile-hint-toggle input { width: auto; margin: 0; }

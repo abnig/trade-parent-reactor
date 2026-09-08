@@ -1,5 +1,11 @@
 # Trade Parent Reactor
 
+User profiles: see [profile API, manual migration V8, and frontend usage](user-profile-management.md).
+
+Password recovery backend: see [API, migration, SMTP setup, and tests](password-reset-backend.md).
+Apply migration V7 before running REST with this feature. Frontend recovery screens
+are a separate integration step.
+
 ## Executive summary
 
 This repository is a Java trading-data platform with three backend workloads and a React UI:

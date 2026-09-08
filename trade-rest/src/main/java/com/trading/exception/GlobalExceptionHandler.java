@@ -81,6 +81,17 @@ public class GlobalExceptionHandler {
                 request, Map.of());
     }
 
+    @ExceptionHandler(com.trading.recovery.RecoveryException.class)
+    public ResponseEntity<ApiError> handleRecovery(com.trading.recovery.RecoveryException exception, HttpServletRequest request) {
+        return error(exception.status(), exception.status().getReasonPhrase(), exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler({org.springframework.web.servlet.resource.NoResourceFoundException.class,
+            org.springframework.web.servlet.NoHandlerFoundException.class})
+    public ResponseEntity<ApiError> handleUnknownRoute(Exception exception, HttpServletRequest request) {
+        return error(HttpStatus.NOT_FOUND, "Not found", "Requested resource was not found.", request, Map.of());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(
             Exception exception, HttpServletRequest request) {

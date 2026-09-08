@@ -7,11 +7,12 @@ import Analytics from './components/Analytics'
 import AuthLinks from './components/AuthLinks'
 import Register from './components/Register'
 import Login from './components/Login'
+import Profile from './components/Profile'
 import api from './api/api'
 
 const tabs = [
   ['brokers', 'Broker Accounts'], ['funds', 'Mutual Funds'],
-  ['transactions', 'Transactions'], ['values', 'Fund Values'], ['analytics', 'Analytics']
+  ['transactions', 'Transactions'], ['values', 'Fund Values'], ['analytics', 'Analytics'], ['profile', 'My profile']
 ]
 
 export default function App() {
@@ -128,6 +129,7 @@ export function AppView({ user, checking, path, activeTab, error, loggingOut, na
             {activeTab === 'transactions' && <MutualFundTransactions />}
             {activeTab === 'values' && <MutualFundValues />}
             {activeTab === 'analytics' && <Analytics />}
+            {activeTab === 'profile' && <Profile />}
           </div>
         ) : (
           <>

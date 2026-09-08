@@ -1,6 +1,8 @@
 package com.trading.dto;
 
 import jakarta.validation.constraints.*;
+import jakarta.validation.Valid;
+import com.trading.recovery.RecoveryRequests.Answer;
 
 public record RegisterRequest(
         @NotBlank @Size(max = 50) @Pattern(regexp = "[A-Za-z0-9_.-]+") String username,
@@ -9,7 +11,8 @@ public record RegisterRequest(
         @Size(max = 50) String firstName,
         @Size(max = 50) String lastName,
         @Size(max = 20) String phoneNumber,
-        @Size(max = 255) String avatarUrl) {
+        @Size(max = 255) String avatarUrl,
+        @Size(min = 3, max = 3) java.util.List<@NotNull @Valid Answer> recoveryAnswers) {
     @Override
     public String toString() { return "RegisterRequest[redacted]"; }
 }

@@ -21,3 +21,15 @@ new migration to correct it, and never modify `flyway_schema_history` manually.
 `V6__portfolio_ownership.sql` adds broker-account ownership. Existing rows stay
 unassigned until explicitly mapped to verified users. While Flyway is disabled,
 apply V5 (if needed) and V6 manually before using login and private portfolios.
+
+`V7__password_recovery.sql` adds recovery answers, challenges, reset tokens,
+rate-limit counters, and user credential/recovery versions. Apply it after V6
+and before starting REST with password-recovery support. Existing users retain
+their credentials but must enroll their own recovery answers. While Flyway is
+disabled, record manual application of V7 along with V5/V6. See
+[password reset setup](../../../../../../password-reset-backend.md).
+
+`V8__user_profile_hint.sql` adds a separate, single profile hint and a
+case-insensitive unique email index. Check and resolve existing case-insensitive
+email duplicates before applying it. Apply the script atomically after V7; see
+[profile migration and API documentation](../../../../../../user-profile-management.md).

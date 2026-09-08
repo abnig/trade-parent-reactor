@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import api from '../api/api'
 import Pagination from './Pagination'
+import { formatDisplayDate } from '../utils/date'
 
 const emptyForm = { mutualFundId: '', totalValue: '', valueAsOfDate: '' }
 const initialPage = { page: 0, size: 20, totalPages: 0, totalElements: 0, first: true, last: true }
@@ -90,5 +91,5 @@ export default function MutualFundValues() {
   </section>
 }
 
-function formatDate(value) { return value ? new Date(value).toLocaleDateString() : '-' }
+function formatDate(value) { return formatDisplayDate(value) }
 function toInputDate(value) { return value ? new Date(value).toISOString().slice(0, 16) : '' }

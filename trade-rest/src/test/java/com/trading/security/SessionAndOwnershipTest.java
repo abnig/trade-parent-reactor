@@ -39,7 +39,7 @@ class SessionAndOwnershipTest {
     @BeforeEach
     void seed() throws Exception {
         jdbc.execute("DROP ALL OBJECTS");
-        for (String file : new String[]{"V3__application_schema.sql", "V5__create_app_user.sql", "V6__portfolio_ownership.sql"}) {
+        for (String file : new String[]{"V3__application_schema.sql", "V5__create_app_user.sql", "V6__portfolio_ownership.sql", "V7__password_recovery.sql"}) {
             String sql = new ClassPathResource("db/migration/" + file).getContentAsString(StandardCharsets.UTF_8)
                     .replace(" ON CONFLICT (name) DO NOTHING", ""); // H2 lacks this PostgreSQL syntax.
             for (String statement : sql.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
