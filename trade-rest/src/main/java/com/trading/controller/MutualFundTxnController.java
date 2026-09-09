@@ -13,7 +13,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+import com.trading.model.result.FundInvestmentSummary;
 import com.trading.dto.PagedResponse;
+import com.trading.dto.MutualFundTxnDto;
 import com.trading.model.MutualFundTxn;
 import com.trading.model.result.TransactionSummary;
 import com.trading.repository.MutualFundTxnRepository;
@@ -39,11 +42,17 @@ public class MutualFundTxnController {
     }
 
     @GetMapping
-    public ResponseEntity<PagedResponse<MutualFundTxn>> findAll(
+    public ResponseEntity<PagedResponse<MutualFundTxnDto>> findAll(
             @RequestParam(defaultValue = "0") long page,
             @RequestParam(defaultValue = "20") long size) {
         PageRequest pageRequest = PageRequest.of(page, size);
-        return ResponseEntity.ok(PagedResponse.of(repository.findAll(pageRequest), pageRequest, repository.count()));
+        return ResponseEntity.ok(PagedResponse.of(repository.findAll(pageRequest).stream()
+                .map(MutualFundTxnDto::from).toList(), pageRequest, repository.count()));
+    }
+
+    @GetMapping("/summary/by-fund")
+    public ResponseEntity<List<FundInvestmentSummary>> getFundInvestments() {
+        return ResponseEntity.ok(repository.getFundInvestments());
     }
 
     @GetMapping("/summary")
@@ -56,26 +65,29 @@ public class MutualFundTxnController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<MutualFundTxn> findById(
+    public ResponseEntity<MutualFundTxnDto> findById(
             @PathVariable @Positive(message = "ID must be positive") Long id) {
 
-        return ResponseEntity.ok(repository.findById(id));
+        return ResponseEntity.ok(MutualFundTxnDto.from(repository.findById(id)));
     }
 
     @GetMapping("/mutual-fund/{mutualFundId}")
-    public ResponseEntity<PagedResponse<MutualFundTxn>> findByMutualFundId(
+    public ResponseEntity<PagedResponse<MutualFundTxnDto>> findByMutualFundId(
             @PathVariable @Positive(message = "Mutual fund ID must be positive") Long mutualFundId,
             @RequestParam(defaultValue = "0") long page,
             @RequestParam(defaultValue = "20") long size) {
         PageRequest pageRequest = PageRequest.of(page, size);
 
-        return ResponseEntity.ok(PagedResponse.of(repository.findByMutualFundId(mutualFundId, pageRequest),
+        return ResponseEntity.ok(PagedResponse.of(repository.findByMutualFundId(mutualFundId, pageRequest).stream()
+                .map(MutualFundTxnDto::from).toList(),
                 pageRequest, repository.countByMutualFundId(mutualFundId)));
     }
 
     @PostMapping
-    public ResponseEntity<MutualFundTxn> create(
-            @Valid @RequestBody MutualFundTxn txn) {
+    public ResponseEntity<MutualFundTxnDto> create(
+            @Valid @RequestBody MutualFundTxnDto request) {
+
+        MutualFundTxn txn = request.toModel();
 
         referenceValidator.requireMutualFund(txn.getMutualFundId());
 
@@ -83,20 +95,22 @@ public class MutualFundTxnController {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(savedTxn);
+                .body(MutualFundTxnDto.from(savedTxn));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<MutualFundTxn> update(
+    public ResponseEntity<MutualFundTxnDto> update(
             @PathVariable @Positive(message = "ID must be positive") Long id,
-            @Valid @RequestBody MutualFundTxn txn) {
+            @Valid @RequestBody MutualFundTxnDto request) {
+
+        MutualFundTxn txn = request.toModel();
 
         txn.setMutualFundTxnId(id);
         referenceValidator.requireMutualFund(txn.getMutualFundId());
 
         MutualFundTxn updatedTxn = repository.update(txn);
 
-        return ResponseEntity.ok(updatedTxn);
+        return ResponseEntity.ok(MutualFundTxnDto.from(updatedTxn));
     }
 
     @DeleteMapping("/{id}")

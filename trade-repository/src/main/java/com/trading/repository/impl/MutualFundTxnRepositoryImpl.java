@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import com.trading.model.MutualFundTxn;
 import com.trading.model.enums.TransactionType;
 import com.trading.model.result.TransactionSummary;
+import com.trading.model.result.FundInvestmentSummary;
 import com.trading.repository.MutualFundTxnRepository;
 import com.trading.repository.PageRequest;
 
@@ -20,6 +21,22 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
 	public MutualFundTxnRepositoryImpl(JdbcTemplate jdbcTemplate) {
 		this.jdbcTemplate = jdbcTemplate;
 	}
+
+    @Override
+    public List<FundInvestmentSummary> getFundInvestments() {
+        String sql = """
+                SELECT f.mutual_fund_id, f.mutual_fund_name,
+                       COALESCE(SUM(CASE WHEN t.txn_type = 'BUY' THEN t.amount
+                                         WHEN t.txn_type = 'SELL' THEN -t.amount ELSE 0 END), 0) AS total_invested
+                FROM mutual_fund f
+                LEFT JOIN mutual_fund_txn t ON t.mutual_fund_id = f.mutual_fund_id
+                GROUP BY f.mutual_fund_id, f.mutual_fund_name
+                ORDER BY f.mutual_fund_name, f.mutual_fund_id
+                """;
+        return jdbcTemplate.query(sql,
+                (rs, row) -> new FundInvestmentSummary(rs.getLong("mutual_fund_id"),
+                        rs.getString("mutual_fund_name"), rs.getBigDecimal("total_invested")));
+    }
 
 	// CREATE
 	@Override

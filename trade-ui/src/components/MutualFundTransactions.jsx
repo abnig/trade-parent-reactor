@@ -1,3 +1,4 @@
+import DateInput from './DateInput'
 import { useEffect, useState } from 'react'
 import api from '../api/api'
 import Pagination from './Pagination'
@@ -9,6 +10,8 @@ const initialPage = { page: 0, size: 20, totalPages: 0, totalElements: 0, first:
 export default function MutualFundTransactions() {
   const [items, setItems] = useState([])
   const [funds, setFunds] = useState([])
+  const [fundsLoading, setFundsLoading] = useState(true)
+  const [fundsError, setFundsError] = useState('')
   const [paging, setPaging] = useState(initialPage)
   const [selectedFundId, setSelectedFundId] = useState('')
   const [form, setForm] = useState(empty)
@@ -23,13 +26,16 @@ export default function MutualFundTransactions() {
   const [summaryRefreshKey, setSummaryRefreshKey] = useState(0)
 
   useEffect(() => {
+    if (!selectedFundId) {
+      setItems([])
+      setLoading(false)
+      return
+    }
     let active = true
     const load = async () => {
       try {
         setLoading(true)
-        const response = selectedFundId
-          ? await api.transactions.byFund(selectedFundId, paging)
-          : await api.transactions.all(paging)
+        const response = await api.transactions.byFund(selectedFundId, paging)
         if (!active) return
         setItems(response.content)
         setPaging(response)
@@ -46,14 +52,18 @@ export default function MutualFundTransactions() {
 
   useEffect(() => {
     let active = true
-    api.mutualFunds.all({ page: 0, size: 100 })
-      .then((response) => { if (active) setFunds(response.content) })
-      .catch((e) => { if (active) setError(e.message) })
+    setFundsLoading(true)
+    setFundsError('')
+    api.transactions.fundInvestments()
+      .then((response) => { if (active) setFunds(response) })
+      .catch((e) => { if (active) setFundsError(e.message || 'Failed to load fund totals.') })
+      .finally(() => { if (active) setFundsLoading(false) })
     return () => { active = false }
-  }, [])
+  }, [summaryRefreshKey])
 
   useEffect(() => {
     let active = true
+    if (!selectedFundId) return
     const loadSummary = async () => {
       try {
         setSummaryLoading(true)
@@ -82,7 +92,7 @@ export default function MutualFundTransactions() {
       const data = {
         mutualFundId: Number(form.mutualFundId), transactionType: form.transactionType,
         amount: Number(form.amount), units: Number(form.units), avgPrice: Number(form.avgPrice),
-        txnDate: new Date(form.txnDate).toISOString()
+        txnDate: form.txnDate
       }
       if (editingId) await api.transactions.update(editingId, { ...data, mutualFundTxnId: editingId })
       else await api.transactions.create(data)
@@ -103,6 +113,10 @@ export default function MutualFundTransactions() {
   }
 
   const selectFund = (value) => {
+    setItems([])
+    setError('')
+    setLoading(Boolean(value))
+    setSummaryLoading(true)
     setSelectedFundId(value)
     setPaging((current) => ({ ...current, page: 0 }))
   }
@@ -116,19 +130,21 @@ export default function MutualFundTransactions() {
       <label>Amount<input required type="number" min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></label>
       <label>Units<input required type="number" min="0" step="0.001" value={form.units} onChange={e => setForm({ ...form, units: e.target.value })} /></label>
       <label>Average Price<input required type="number" min="0" step="0.001" value={form.avgPrice} onChange={e => setForm({ ...form, avgPrice: e.target.value })} /></label>
-      <label>Transaction Date<input required type="datetime-local" value={form.txnDate} onChange={e => setForm({ ...form, txnDate: e.target.value })} /></label>
+      <label>Transaction Date<DateInput required value={form.txnDate} onChange={value => setForm({ ...form, txnDate: value })} /></label>
     </div><div className="form-actions"><button type="button" className="secondary" onClick={reset}>Cancel</button><button className="primary" type="submit">{editingId ? 'Update' : 'Create'}</button></div></form>}
     <div className="filter-card"><label>Filter by Mutual Fund<select value={selectedFundId} onChange={e => selectFund(e.target.value)}><option value="">All Mutual Funds</option>{funds.map(f => <option key={f.mutualFundId} value={f.mutualFundId}>{f.mutualFundName}</option>)}</select></label>{selectedFundId && <button className="secondary clear-filter" type="button" onClick={() => selectFund('')}>Clear Filter</button>}</div>
-    <section className="transaction-summary" aria-label="Transaction summary">
+    {selectedFundId && <section className="transaction-summary" aria-label="Transaction summary">
       {summaryLoading ? <p className="summary-label">Loading transaction summary...</p> : summaryError ? <p className="error" role="alert">Unable to load transaction summary: {summaryError}</p> : <>
         <div className="summary-item"><span className="summary-label">Total Transaction Value</span><strong>{formatCurrency(transactionSummary?.totalValue)}</strong></div>
         <div className="summary-item"><span className="summary-label">Total Transaction Units</span><strong>{formatUnits(transactionSummary?.totalUnits)}</strong></div>
       </>}
-    </section>
+    </section>}
+    {!selectedFundId ? <FundInvestmentOverview funds={funds} loading={fundsLoading} error={fundsError} /> : <>
     <div className="table-wrap"><table><thead><tr><th>Mutual Fund</th><th>Type</th><th>Amount</th><th>Units</th><th>Avg Price</th><th>Transaction Date</th><th>Actions</th></tr></thead><tbody>
       {loading ? <tr><td colSpan="7" className="empty">Loading...</td></tr> : items.length === 0 ? <tr><td colSpan="7" className="empty">No transactions found.</td></tr> : items.map(t => <tr key={t.mutualFundTxnId}><td>{fundName(t.mutualFundId)}</td><td>{t.transactionType}</td><td>{formatNumber(t.amount)}</td><td>{formatNumber(t.units)}</td><td>{formatNumber(t.avgPrice)}</td><td>{formatDate(t.txnDate)}</td><td><div className="actions"><button onClick={() => { setForm({ mutualFundId: String(t.mutualFundId), transactionType: t.transactionType || 'BUY', amount: String(t.amount ?? ''), units: String(t.units ?? ''), avgPrice: String(t.avgPrice ?? ''), txnDate: toInputDate(t.txnDate) }); setEditingId(t.mutualFundTxnId); setShowForm(true) }}>Edit</button><button className="danger-text" onClick={() => remove(t.mutualFundTxnId)}>Delete</button></div></td></tr>)}
     </tbody></table></div>
     {!loading && <Pagination {...paging} loading={loading} onPrevious={() => setPaging(c => ({ ...c, page: c.page - 1 }))} onNext={() => setPaging(c => ({ ...c, page: c.page + 1 }))} onSizeChange={(size) => setPaging(c => ({ ...c, page: 0, size }))} />}
+    </>}
   </section>
 }
 
@@ -136,4 +152,24 @@ function formatNumber(value) { return Number(value || 0).toLocaleString(undefine
 function formatCurrency(value) { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value ?? 0)) }
 function formatUnits(value) { return new Intl.NumberFormat('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 4 }).format(Number(value ?? 0)) }
 function formatDate(value) { return formatDisplayDate(value) }
-function toInputDate(value) { return value ? new Date(value).toISOString().slice(0, 16) : '' }
+function toInputDate(value) { return value ? formatDate(value) : '' }
+
+export function FundInvestmentOverview({ funds, loading, error }) {
+  return <section aria-label="Investment totals by fund">
+    <p className="transaction-note">Select a fund from the drop-down above to see its individual transactions.</p>
+    <p className="transaction-note">Total invested amount is purchases minus redemptions.</p>
+    <div className="table-wrap"><table>
+      <thead><tr><th>Mutual Fund</th><th>Total Invested Amount</th></tr></thead>
+      <tbody>{loading ? <tr><td colSpan="2" className="empty">Loading fund totals...</td></tr>
+        : error ? <tr><td colSpan="2" className="error" role="alert">Unable to load fund totals: {error}</td></tr>
+        : funds.length === 0 ? <tr><td colSpan="2" className="empty">No mutual funds found.</td></tr>
+        : funds.map(fund => <tr key={fund.mutualFundId}>
+          <td>{fund.mutualFundName}</td><td>{formatCurrency(fund.totalInvested)}</td>
+        </tr>)}</tbody>
+      {!loading && !error && <tfoot><tr>
+        <th scope="row">Grand Total</th>
+        <td><strong>{formatCurrency(funds.reduce((total, fund) => total + Number(fund.totalInvested ?? 0), 0))}</strong></td>
+      </tr></tfoot>}
+    </table></div>
+  </section>
+}

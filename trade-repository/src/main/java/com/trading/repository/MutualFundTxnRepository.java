@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.trading.model.MutualFundTxn;
 import com.trading.model.result.TransactionSummary;
+import com.trading.model.result.FundInvestmentSummary;
 
 public interface MutualFundTxnRepository {
 
@@ -22,6 +23,8 @@ public interface MutualFundTxnRepository {
 	List<MutualFundTxn> findByMutualFundId(Long mutualFundId, PageRequest pageRequest);
 
 	long countByMutualFundId(Long mutualFundId);
+
+	List<FundInvestmentSummary> getFundInvestments();
 
 	TransactionSummary getSummary();
 

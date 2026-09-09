@@ -93,6 +93,7 @@ export const api = {
   },
 
   transactions: {
+    fundInvestments: () => request('/api/mutual-fund-txns/summary/by-fund'),
     all: (paging) => request(pagedUrl('/api/mutual-fund-txns', paging)),
     get: (id) => request(`/api/mutual-fund-txns/${id}`),
     byFund: (mutualFundId, paging) => request(pagedUrl(`/api/mutual-fund-txns/mutual-fund/${mutualFundId}`, paging)),
@@ -103,6 +104,13 @@ export const api = {
   },
 
   values: {
+    latestByFund: async () => {
+      const funds = await api.analytics.funds()
+      return Promise.all(funds.map(async (fund) => {
+        const response = await api.values.byFund(fund.mutualFundId, { page: 0, size: 1 })
+        return { ...fund, latestValue: response.content[0] ?? null }
+      }))
+    },
     all: (paging) => request(pagedUrl('/api/mutual-fund-values', paging)),
     get: (id) => request(`/api/mutual-fund-values/${id}`),
     byFund: (mutualFundId, paging) => request(pagedUrl(`/api/mutual-fund-values/mutual-fund/${mutualFundId}`, paging)),

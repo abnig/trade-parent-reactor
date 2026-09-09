@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { AppView } from './App'
-import { formatDisplayDate } from './utils/date'
+import { formatDisplayDate, dateRangeError, isWithinDateRange } from './utils/date'
 
 test('formats analytics, transaction, and fund value dates as DD-Mon-YYYY', () => {
   assert.equal(formatDisplayDate('2026-09-08T15:30:00Z'), '08-Sep-2026')
@@ -22,6 +22,24 @@ test('investment history includes earlier purchases, same-day sales, and transac
   ], '1', ['2025-12-01', '2026-02-01', '2026-04-01'].map(historyDate))
   assert.deepEqual(history.map(point => point.invested), [0, 100, 120, -80, -80])
   assert.equal(history[2].date.getTime(), historyDate('2026-02-01').getTime())
+})
+
+test('date ranges carry forward cumulative investment without including future transactions', () => {
+  const transactions = [
+    { mutualFundId: 1, txnDate: '2026-01-01', amount: 100, transactionType: 'BUY' },
+    { mutualFundId: 1, txnDate: '2026-01-15', amount: 30, transactionType: 'SELL' },
+    { mutualFundId: 2, txnDate: '2026-01-01', amount: 999, transactionType: 'BUY' },
+    { mutualFundId: 1, txnDate: '2026-03-01', amount: 50, transactionType: 'BUY' }
+  ]
+  const dates = ['2026-02-01', '2026-02-28'].map(historyDate)
+  const history = investmentHistory(transactions, '1', dates, '2026-02-01', '2026-02-28')
+  assert.deepEqual(history, dates.map(date => ({ date, invested: 70 })))
+  assert.deepEqual(investmentHistory(transactions, 1, dates, '2026-02-01', '2026-03-01')
+    .map(point => point.invested), [70, 70, 120])
+  assert.deepEqual(investmentHistory(transactions, 1, [historyDate('2025-12-01')], '', '2025-12-31')
+    .map(point => point.invested), [0])
+  assert.deepEqual(investmentHistory(transactions, 1, [historyDate('2026-04-01')], '2026-04-01')
+    .map(point => point.invested), [120])
 })
 
 test('investment history handles no transactions and rejects invalid selected-fund data', () => {
@@ -120,4 +138,146 @@ test('profile payload excludes ownership, username, and unchanged hints', () => 
   assert.equal(sensitive.hintQuestion, 2)
   assert.equal(sensitive.hintAnswer, 'new answer')
   assert.equal(sensitive.currentPassword, 'test password')
+})
+
+test('transaction API calendar dates display and accumulate correctly in analytics', () => {
+  assert.equal(formatDisplayDate('09-Sep-2026'), '09-Sep-2026')
+  assert.equal(historyDate('09-Sep-2026').getTime(), historyDate('2026-09-09T23:30:00Z').getTime())
+  assert.ok(Number.isNaN(historyDate('31-Feb-2026').getTime()))
+  const history = investmentHistory([
+    { mutualFundId: 1, txnDate: '31-Aug-2026', amount: 100, transactionType: 'BUY' },
+    { mutualFundId: 1, txnDate: '09-Sep-2026', amount: 25, transactionType: 'SELL' }
+  ], 1, [historyDate('2026-09-09')], '2026-09-01', '2026-09-09')
+  assert.deepEqual(history.map(point => point.invested), [75])
+})
+
+test('analytics provides formatted text fields and calendar pickers for both range endpoints', () => {
+  const html = render({ user: { username: 'alice' }, activeTab: 'analytics' })
+  assert.equal((html.match(/type="date"/g) || []).length, 2)
+  assert.equal((html.match(/placeholder="DD-Mon-YYYY"/g) || []).length, 2)
+  assert.doesNotMatch(html, /type="datetime-local"/)
+})
+
+test('date ranges validate calendar dates and compare chronologically across months and years', () => {
+  assert.equal(dateRangeError('', ''), '')
+  assert.equal(dateRangeError('31-Dec-2025', '01-Jan-2026'), '')
+  assert.equal(dateRangeError('29-Feb-2024', ''), '')
+  assert.equal(dateRangeError('09-Sep-2026', '09-Sep-2026'), '')
+  assert.match(dateRangeError('01-Jan-2026', '31-Dec-2025'), /on or before/)
+  for (const invalid of ['31-Feb-2026', '29-Feb-2025', '09-Sept-2026', '2026-09-09', '09-Sep-']) {
+    assert.match(dateRangeError(invalid, ''), /DD-Mon-YYYY/)
+  }
+  assert.equal(isWithinDateRange('2026-01-01T23:30:00Z', '31-Dec-2025', '01-Jan-2026'), true)
+  assert.equal(isWithinDateRange('01-Jan-2026', '31-Dec-2025', '01-Jan-2026'), true)
+  assert.equal(isWithinDateRange('2025-12-30', '31-Dec-2025', ''), false)
+  assert.equal(isWithinDateRange('2026-01-02', '', '01-Jan-2026'), false)
+  assert.equal(isWithinDateRange('invalid', '', ''), false)
+  assert.equal(formatDisplayDate('2026-09-01T00:00:00'), '01-Sep-2026')
+  assert.equal(formatDisplayDate('31-Feb-2026'), '-')
+})
+
+import { FundInvestmentOverview } from './components/MutualFundTransactions'
+
+test('unfiltered transactions show fund totals and a selection prompt instead of individual transactions', () => {
+  const html = render({ user: { username: 'alice' }, activeTab: 'transactions' })
+  assert.match(html, /Select a fund from the drop-down above/)
+  assert.match(html, /Total Invested Amount/)
+  assert.doesNotMatch(html, /<th>Transaction Date<\/th>|<th>Actions<\/th>/)
+  const overview = renderToStaticMarkup(<FundInvestmentOverview funds={[
+    { mutualFundId: 1, mutualFundName: 'Growth', totalInvested: 1250 },
+    { mutualFundId: 2, mutualFundName: 'Empty fund', totalInvested: 0 }
+  ]} loading={false} error="" />)
+  assert.match(overview, /Growth/)
+  assert.match(overview, /1,250.00/)
+  assert.match(overview, /Empty fund/)
+  assert.match(overview, /₹0.00/)
+})
+
+test('fund overview shows loading, empty and failure states', () => {
+  assert.match(renderToStaticMarkup(<FundInvestmentOverview funds={[]} loading={true} />), /Loading fund totals/)
+  assert.match(renderToStaticMarkup(<FundInvestmentOverview funds={[]} loading={false} />), /No mutual funds found/)
+  assert.match(renderToStaticMarkup(<FundInvestmentOverview funds={[]} loading={false} error="Unavailable" />), /Unable to load fund totals: Unavailable/)
+})
+
+test('fund overview grand total sums net investments across all funds', () => {
+  const html = renderToStaticMarkup(<FundInvestmentOverview funds={[
+    { mutualFundId: 1, mutualFundName: 'Growth', totalInvested: 1250.50 },
+    { mutualFundId: 2, mutualFundName: 'Income', totalInvested: '249.75' },
+    { mutualFundId: 3, mutualFundName: 'Redeemed', totalInvested: -100 },
+    { mutualFundId: 4, mutualFundName: 'Empty', totalInvested: null }
+  ]} loading={false} />)
+  assert.match(html, /<tfoot>.*Grand Total.*₹1,400.25.*<\/tfoot>/)
+  assert.match(renderToStaticMarkup(<FundInvestmentOverview funds={[]} loading={false} />), /<tfoot>.*Grand Total.*₹0.00.*<\/tfoot>/)
+  assert.doesNotMatch(renderToStaticMarkup(<FundInvestmentOverview funds={[]} loading={true} />), /Grand Total/)
+  assert.doesNotMatch(renderToStaticMarkup(<FundInvestmentOverview funds={[]} loading={false} error="Unavailable" />), /Grand Total/)
+})
+
+import { FundValueOverview } from './components/MutualFundValues'
+
+test('unfiltered fund values show the latest-value overview and selection prompt', () => {
+  const html = render({ user: { username: 'alice' }, activeTab: 'values' })
+  assert.match(html, /Select a fund from the drop-down above to see its individual transactions/)
+  assert.match(html, /Latest Value/)
+  assert.doesNotMatch(html, /<th>Actions<\/th>/)
+})
+
+test('fund value overview shows dated valuations, missing values and their grand total', () => {
+  const html = renderToStaticMarkup(<FundValueOverview funds={[
+    { mutualFundId: 1, mutualFundName: 'Growth', latestValue: { totalValue: '1250.50', valueAsOfDate: '09-Sep-2026' } },
+    { mutualFundId: 2, mutualFundName: 'Income', latestValue: { totalValue: 249.75, valueAsOfDate: '01-Sep-2026' } },
+    { mutualFundId: 3, mutualFundName: 'Empty', latestValue: null },
+    { mutualFundId: 4, mutualFundName: 'Zero', latestValue: { totalValue: 0, valueAsOfDate: '02-Sep-2026' } }
+  ]} loading={false} />)
+  assert.match(html, /Growth<\/td><td>₹1,250.50<\/td><td>09-Sep-2026/)
+  assert.match(html, /Empty<\/td><td>No value recorded<\/td><td>-/)
+  assert.match(html, /Zero<\/td><td>₹0.00/)
+  assert.match(html, /<tfoot>.*Grand Total.*₹1,500.25.*<\/tfoot>/)
+})
+
+test('fund value overview handles loading, empty and failure without misleading totals', () => {
+  const loading = renderToStaticMarkup(<FundValueOverview funds={[]} loading={true} />)
+  assert.match(loading, /Loading latest fund values/)
+  assert.doesNotMatch(loading, /Grand Total/)
+  const error = renderToStaticMarkup(<FundValueOverview funds={[]} loading={false} error="Unavailable" />)
+  assert.match(error, /Unable to load latest fund values/)
+  assert.doesNotMatch(error, /Grand Total/)
+  const empty = renderToStaticMarkup(<FundValueOverview funds={[]} loading={false} />)
+  assert.match(empty, /No mutual funds found/)
+  assert.match(empty, /<tfoot>.*Grand Total.*₹0.00/)
+})
+
+import DateInput, { toPickerDate, fromPickerDate } from './components/DateInput'
+
+test('date pickers round-trip calendar dates without changing the API date format', () => {
+  for (const [display, native] of [['09-Sep-2026', '2026-09-09'], ['29-Feb-2024', '2024-02-29'], ['01-Jan-2026', '2026-01-01'], ['31-Dec-2025', '2025-12-31']]) {
+    assert.equal(toPickerDate(display), native)
+    assert.equal(fromPickerDate(native), display)
+  }
+  assert.equal(toPickerDate(''), '')
+  assert.equal(fromPickerDate(''), '')
+  assert.equal(toPickerDate('31-Feb-2026'), '')
+})
+
+test('shared date picker preserves required and accessibility properties and emits formatted changes', () => {
+  let changed
+  const input = DateInput({ value: '09-Sep-2026', onChange: value => { changed = value }, required: true, 'aria-label': 'Transaction Date' })
+  const html = renderToStaticMarkup(input)
+  assert.match(html, /type="date"/)
+  assert.match(html, /value="2026-09-09"/)
+  assert.match(html, /required=""/)
+  assert.match(html, /aria-label="Transaction Date"/)
+  assert.match(html, /type="text".*value="09-Sep-2026"/)
+  const textInput = input.props.children[0]
+  const picker = input.props.children[1].props.children[1]
+  let validity
+  textInput.props.onChange({ target: { value: '31-Feb-2026', setCustomValidity: message => { validity = message } } })
+  assert.match(validity, /valid date/)
+  textInput.props.onChange({ target: { value: '10-Sep-2026', setCustomValidity: message => { validity = message } } })
+  assert.equal(validity, '')
+  assert.equal(changed, '10-Sep-2026')
+  const currentTarget = { parentElement: { previousElementSibling: { setCustomValidity: message => { validity = message } } } }
+  picker.props.onChange({ target: { value: '2026-10-01' }, currentTarget })
+  assert.equal(changed, '01-Oct-2026')
+  picker.props.onChange({ target: { value: '' }, currentTarget })
+  assert.equal(changed, '')
 })

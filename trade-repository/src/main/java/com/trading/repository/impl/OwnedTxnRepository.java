@@ -5,6 +5,7 @@ import java.util.List;
 import com.trading.model.MutualFundTxn;
 import com.trading.model.enums.TransactionType;
 import com.trading.model.result.TransactionSummary;
+import com.trading.model.result.FundInvestmentSummary;
 import com.trading.repository.MutualFundTxnRepository;
 import com.trading.repository.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -14,6 +15,24 @@ final class OwnedTxnRepository extends OwnedPortfolioJdbc implements MutualFundT
     OwnedTxnRepository(JdbcTemplate jdbc, long userId) { super(jdbc, userId); }
 
     private String scope() { return fundOwned("mutual_fund_id"); }
+
+    @Override
+    public List<FundInvestmentSummary> getFundInvestments() {
+        String sql = """
+                SELECT f.mutual_fund_id, f.mutual_fund_name,
+                       COALESCE(SUM(CASE WHEN t.txn_type = 'BUY' THEN t.amount
+                                         WHEN t.txn_type = 'SELL' THEN -t.amount ELSE 0 END), 0) AS total_invested
+                FROM mutual_fund f
+                LEFT JOIN mutual_fund_txn t ON t.mutual_fund_id = f.mutual_fund_id
+                WHERE f.broker_account_id IN (
+                    SELECT broker_account_id FROM mutual_fund_broker_account WHERE owner_user_id = :owner)
+                GROUP BY f.mutual_fund_id, f.mutual_fund_name
+                ORDER BY f.mutual_fund_name, f.mutual_fund_id
+                """;
+        return jdbc.query(sql, parameters(),
+                (rs, row) -> new FundInvestmentSummary(rs.getLong("mutual_fund_id"),
+                        rs.getString("mutual_fund_name"), rs.getBigDecimal("total_invested")));
+    }
 
     @Override
     public List<MutualFundTxn> findAll(PageRequest page) {

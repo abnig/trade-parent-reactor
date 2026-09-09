@@ -1,7 +1,8 @@
+import DateInput from './DateInput'
 import { useEffect, useMemo, useState } from 'react'
 import api from '../api/api'
 import { historyDate, investmentHistory } from './investmentHistory'
-import { formatDisplayDate } from '../utils/date'
+import { formatDisplayDate, dateRangeError, isWithinDateRange } from '../utils/date'
 
 
 const formatValue = (value) =>
@@ -12,13 +13,6 @@ const formatValue = (value) =>
 
 const formatDate = (value) => {
   return formatDisplayDate(value)
-}
-
-const datePart = (value) => String(value || '').slice(0, 10)
-
-const isWithinDateRange = (value, fromDate, toDate) => {
-  const date = datePart(value)
-  return (!fromDate || date >= fromDate) && (!toDate || date <= toDate)
 }
 
 const formatAxisValue = (value) => {
@@ -44,6 +38,7 @@ export default function Analytics() {
   const [toDate, setToDate] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const rangeError = dateRangeError(fromDate, toDate)
 
   useEffect(() => {
     let active = true
@@ -136,13 +131,9 @@ export default function Analytics() {
       )
   }, [values, selectedFundId, fromDate, toDate])
 
-  const filteredTransactions = useMemo(() => transactions.filter((item) =>
-    isWithinDateRange(item.txnDate, fromDate, toDate)
-  ), [transactions, fromDate, toDate])
-
   const investments = useMemo(() => investmentHistory(
-    filteredTransactions, selectedFundId, chartData.map(item => item.date)
-  ), [filteredTransactions, selectedFundId, chartData])
+    transactions, selectedFundId, chartData.map(item => item.date), fromDate, toDate
+  ), [transactions, selectedFundId, chartData, fromDate, toDate])
 
   /*
    * Calculate SVG chart coordinates.
@@ -350,28 +341,28 @@ export default function Analytics() {
         </label>
         <label>
           From date
-          <input
-            type="date"
+          <DateInput
+            aria-invalid={Boolean(rangeError)}
+            aria-describedby={rangeError ? "date-range-error" : undefined}
             value={fromDate}
-            max={toDate || undefined}
-            onChange={(event) => setFromDate(event.target.value)}
+            onChange={setFromDate}
             disabled={loading}
           />
         </label>
         <label>
           To date
-          <input
-            type="date"
+          <DateInput
+            aria-invalid={Boolean(rangeError)}
+            aria-describedby={rangeError ? "date-range-error" : undefined}
             value={toDate}
-            min={fromDate || undefined}
-            onChange={(event) => setToDate(event.target.value)}
+            onChange={setToDate}
             disabled={loading}
           />
         </label>
       </div>
 
-      {fromDate && toDate && fromDate > toDate && (
-        <div className="error">From date must be on or before the to date.</div>
+      {rangeError && (
+        <div id="date-range-error" className="error" role="alert">{rangeError}</div>
       )}
 
       {/* No fund selected */}
@@ -393,10 +384,10 @@ export default function Analytics() {
       ) : error ? (
         <div className="analytics-empty">Value history could not be loaded. Please try again.</div>
 
-      ) : fromDate && toDate && fromDate > toDate ? (
+      ) : rangeError ? (
         <div className="analytics-empty">
           <h3>Invalid date range</h3>
-          <p>Choose a from date on or before the to date.</p>
+          <p>{rangeError}</p>
         </div>
 
       ) : chartData.length === 0 ? (
