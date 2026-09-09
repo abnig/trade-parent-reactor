@@ -116,3 +116,70 @@ test('profile duplicate email errors reach the form', async (t) => {
     : new Response(JSON.stringify({ message: 'Email address is already registered.' }), { status: 409 }))
   await assert.rejects(api.profile.update({ email: 'bob@example.com' }), error => error.status === 409 && /already registered/.test(error.message))
 })
+
+test('fund value create and update preserve date-only API values', async (t) => {
+  const calls = []
+  const value = { mutualFundId: 1, totalValue: 500, valueAsOfDate: '09-Sep-2026' }
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url === '/api/auth/csrf') return new Response(JSON.stringify({ headerName: 'X-CSRF-TOKEN', token: 'test-csrf' }))
+    calls.push([url, options.method, JSON.parse(options.body)])
+    return new Response(JSON.stringify({ ...value, valId: 7 }))
+  })
+  assert.equal((await api.values.create(value)).valueAsOfDate, '09-Sep-2026')
+  assert.equal((await api.values.update(7, value)).valueAsOfDate, '09-Sep-2026')
+  assert.deepEqual(calls, [
+    ['/api/mutual-fund-values', 'POST', value],
+    ['/api/mutual-fund-values/7', 'PUT', value]
+  ])
+})
+
+test('transaction create and update preserve date-only API values', async (t) => {
+  const calls = []
+  const txn = { mutualFundId: 1, amount: 100, units: 2, avgPrice: 50, transactionType: 'BUY', txnDate: '09-Sep-2026' }
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url === '/api/auth/csrf') return new Response(JSON.stringify({ headerName: 'X-CSRF-TOKEN', token: 'test-csrf' }))
+    calls.push([url, options.method, JSON.parse(options.body)])
+    return new Response(JSON.stringify({ ...txn, mutualFundTxnId: 7 }))
+  })
+  assert.equal((await api.transactions.create(txn)).txnDate, '09-Sep-2026')
+  assert.equal((await api.transactions.update(7, txn)).txnDate, '09-Sep-2026')
+  assert.deepEqual(calls, [
+    ['/api/mutual-fund-txns', 'POST', txn],
+    ['/api/mutual-fund-txns/7', 'PUT', txn]
+  ])
+})
+
+test('fund investment overview loads server totals without transaction pagination', async (t) => {
+  const totals = [{ mutualFundId: 1, mutualFundName: 'Fund', totalInvested: 106 }]
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.equal(url, '/api/mutual-fund-txns/summary/by-fund')
+    return new Response(JSON.stringify(totals))
+  })
+  assert.deepEqual(await api.transactions.fundInvestments(), totals)
+})
+
+test('latest fund values fetch the newest record for every fund including unvalued funds', async (t) => {
+  const funds = Array.from({ length: 101 }, (_, index) => ({ mutualFundId: index + 1, mutualFundName: `Fund ${index + 1}` }))
+  const latest = { valId: 9, totalValue: 1250, valueAsOfDate: '09-Sep-2026' }
+  const calls = []
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    calls.push(url)
+    if (url === '/api/analytics/funds') return new Response(JSON.stringify(funds))
+    assert.match(url, /^\/api\/mutual-fund-values\/mutual-fund\/\d+\?page=0&size=1$/)
+    return new Response(JSON.stringify({ content: url.includes('/1?') ? [latest] : [], totalPages: 20 }))
+  })
+  const overview = await api.values.latestByFund()
+  assert.equal(overview.length, 101)
+  assert.deepEqual(overview[0], { ...funds[0], latestValue: latest })
+  assert.deepEqual(overview[100], { ...funds[100], latestValue: null })
+  assert.equal(calls.length, 102)
+})
+
+test('latest fund values reject incomplete totals when a fund request fails', async (t) => {
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    if (url === '/api/analytics/funds') return new Response(JSON.stringify([{ mutualFundId: 1 }, { mutualFundId: 2 }]))
+    if (url.includes('/2?')) return new Response(JSON.stringify({ message: 'Unavailable' }), { status: 500 })
+    return new Response(JSON.stringify({ content: [{ totalValue: 100 }] }))
+  })
+  await assert.rejects(api.values.latestByFund(), /Unavailable/)
+})

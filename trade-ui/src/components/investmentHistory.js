@@ -1,7 +1,9 @@
-// Compare end-of-day values with all cash flows recorded on that calendar date.
-export const historyDate = (value) => new Date(`${String(value).slice(0, 10)}T00:00:00`)
+import { parseCalendarDate } from '../utils/date'
 
-export function investmentHistory(transactions, fundId, valueDates) {
+// Compare end-of-day values with all cash flows recorded on that calendar date.
+export const historyDate = parseCalendarDate
+
+export function investmentHistory(transactions, fundId, valueDates, fromDate = '', toDate = '') {
   const changes = new Map()
   for (const transaction of transactions) {
     if (String(transaction.mutualFundId) !== String(fundId)) continue
@@ -16,8 +18,11 @@ export function investmentHistory(transactions, fundId, valueDates) {
   }
   const times = [...new Set([...changes.keys(), ...valueDates.map(date => date.getTime())])].sort((a, b) => a - b)
   let invested = 0
+  const fromTime = fromDate ? historyDate(fromDate).getTime() : -Infinity
+  const toTime = toDate ? historyDate(toDate).getTime() : Infinity
+  // Accumulate the full history before filtering so the opening balance carries forward.
   return times.map(time => {
     invested += changes.get(time) || 0
     return { date: new Date(time), invested }
-  })
+  }).filter(point => point.date.getTime() >= fromTime && point.date.getTime() <= toTime)
 }

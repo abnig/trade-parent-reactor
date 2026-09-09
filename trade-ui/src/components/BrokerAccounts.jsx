@@ -1,3 +1,4 @@
+import { formatDisplayDate } from '../utils/date'
 import { useEffect, useState } from 'react'
 import api from '../api/api'
 import Pagination from './Pagination'
@@ -95,8 +96,4 @@ function FormActions({ editing, onCancel }) { return <div className="form-action
 function Actions({ onEdit, onDelete }) { return <div className="actions"><button onClick={onEdit}>Edit</button><button className="danger-text" onClick={onDelete}>Delete</button></div> }
 function Table({ loading, empty, headers, children }) { return <div className="table-wrap">{loading ? <div className="empty">Loading...</div> : <table><thead><tr>{headers.map(h => <th key={h}>{h}</th>)}</tr></thead><tbody>{empty ? <tr><td colSpan={headers.length} className="empty">No broker accounts found.</td></tr> : children}</tbody></table>}</div> }
 
-function formatDate(value) {
-  if (!value) return '-'
-  const date = new Date(value)
-  return `${date.toLocaleDateString('en-GB', { day: '2-digit' })}-${date.toLocaleDateString('en-GB', { month: 'short' })}-${date.toLocaleDateString('en-GB', { year: 'numeric' })}`
-}
+function formatDate(value) { return formatDisplayDate(value) }

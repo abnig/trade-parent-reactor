@@ -70,6 +70,30 @@ class SessionAndOwnershipTest {
         return session;
     }
 
+    @Test void fundInvestmentTotalsIncludeAllTransactionsAndOnlyOwnedFunds() throws Exception {
+        jdbc.update("INSERT INTO mutual_fund(broker_account_id,mutual_fund_name) VALUES(1,'Fund 1')");
+        for (int n = 0; n < 101; n++) {
+            jdbc.update("INSERT INTO mutual_fund_txn(mutual_fund_id,amount,txn_date,units,avg_price,txn_type) VALUES(1,1,CURRENT_TIMESTAMP,1,1,'BUY')");
+        }
+        jdbc.update("INSERT INTO mutual_fund_txn(mutual_fund_id,amount,txn_date,units,avg_price,txn_type) VALUES(1,5,CURRENT_TIMESTAMP,1,5,'SELL')");
+        mvc.perform(get("/api/mutual-fund-txns/summary/by-fund")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/mutual-fund-txns/summary/by-fund").session(login("alice")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].mutualFundId").value(1))
+                .andExpect(jsonPath("$[0].totalInvested").value(106))
+                .andExpect(jsonPath("$[1].mutualFundId").value(4))
+                .andExpect(jsonPath("$[1].totalInvested").value(0));
+        mvc.perform(get("/api/mutual-fund-txns/summary/by-fund").session(login("bob")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].mutualFundId").value(2))
+                .andExpect(jsonPath("$[0].totalInvested").value(20));
+        var unscoped = new com.trading.repository.impl.MutualFundTxnRepositoryImpl(jdbc).getFundInvestments();
+        assertEquals(4, unscoped.size());
+        assertEquals(0, unscoped.getFirst().totalInvested().compareTo(new java.math.BigDecimal("106")));
+    }
+
     @Test void anonymousCannotReadOrWritePortfolio() throws Exception {
         for (String path : PATHS) {
             mvc.perform(get(path)).andExpect(status().isUnauthorized());
