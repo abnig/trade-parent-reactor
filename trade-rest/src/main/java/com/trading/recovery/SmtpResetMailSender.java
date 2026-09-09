@@ -42,4 +42,15 @@ public class SmtpResetMailSender implements ResetMailSender {
                 + "\n\nThis link works once. If you did not request a reset, ignore this email.");
         sender.getObject().send(message);
     }
+
+    @Override public void sendUsername(String email, String username) {
+        requireConfigured();
+        var message = new SimpleMailMessage();
+        message.setFrom(from);
+        message.setTo(email);
+        message.setSubject("Your Trade Management username");
+        message.setText("Your Trade Management username is: " + username
+                + "\n\nIf you did not request this reminder, you can ignore this email. Your password has not changed.");
+        sender.getObject().send(message);
+    }
 }

@@ -31,6 +31,10 @@ export default function Login({ onLoggedIn }) {
           <div className="form-actions"><button className="primary" type="submit">{submitting ? 'Signing in…' : 'Login'}</button></div>
         </fieldset>
       </form>
+      <p className="login-recovery-links">
+        <a className="reset-password-link" href="/reset-password">Reset password</a>
+        <a className="reset-password-link" href="/forgot-username">Forgot username</a>
+      </p>
     </section>
   )
 }

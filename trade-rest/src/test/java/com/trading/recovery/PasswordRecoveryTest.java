@@ -84,6 +84,36 @@ class PasswordRecoveryTest {
         assertNotNull(emailedToken.get());
         return emailedToken.get();
     }
+    @Test void usernameReminderUsesStoredEmailAndDoesNotDiscloseAccountExistence() throws Exception {
+        var session = new MockHttpSession();
+        var known = mvc.perform(csrf(post("/api/auth/forgot-username").contentType("application/json")
+                .content("{\"email\":\"ALICE@example.com\"}"), session))
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
+        verify(mail).sendUsername("alice@example.com", "alice");
+        clearInvocations(mail);
+        var unknown = mvc.perform(csrf(post("/api/auth/forgot-username").contentType("application/json")
+                .content("{\"email\":\"unknown@example.com\"}"), session))
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
+        assertEquals(known, unknown);
+        verify(mail, never()).sendUsername(anyString(), anyString());
+        jdbc.update("UPDATE users SET enabled=false WHERE username='alice'");
+        service.remindUsername("alice@example.com", "other-source");
+        verify(mail, never()).sendUsername(anyString(), anyString());
+    }
+    @Test void usernameReminderValidatesEmailRequiresCsrfAndLimitsRequests() throws Exception {
+        mvc.perform(post("/api/auth/forgot-username").contentType("application/json")
+                .content("{\"email\":\"alice@example.com\"}")).andExpect(status().isUnauthorized());
+        var session = new MockHttpSession();
+        mvc.perform(csrf(post("/api/auth/forgot-username").contentType("application/json")
+                .content("{\"email\":\"invalid\"}"), session)).andExpect(status().isBadRequest());
+        for (int i = 0; i < 5; i++) service.remindUsername("unknown@example.com", "source");
+        assertEquals(429, assertThrows(RecoveryException.class,
+                () -> service.remindUsername("UNKNOWN@example.com", "source")).status().value());
+    }
+    @Test void usernameReminderDoesNotExposeMailFailures() {
+        doThrow(new IllegalStateException("private SMTP details")).when(mail).sendUsername(anyString(), anyString());
+        assertDoesNotThrow(() -> service.remindUsername("alice@example.com", "source"));
+    }
     @Test void fullHttpFlowSendsOnlyToStoredEmailConsumesTokenAndRevokesSession() throws Exception {
         var loggedIn = login(PASSWORD);
         var anonymous = new MockHttpSession();

@@ -16,6 +16,14 @@ public class PasswordRecoveryController {
     private final PasswordRecoveryService service;
     public PasswordRecoveryController(PasswordRecoveryService service) { this.service = service; }
 
+    @PostMapping("/forgot-username")
+    public ResponseEntity<Map<String, String>> remindUsername(
+            @Valid @RequestBody RecoveryRequests.ForgotUsername request, HttpServletRequest http) {
+        service.remindUsername(request.email(), http.getRemoteAddr());
+        return ResponseEntity.accepted().body(Map.of("message",
+                "If an eligible account matches that email address, its username will be sent to it."));
+    }
+
     @GetMapping("/recovery/questions")
     public List<PasswordRecoveryService.Question> questions() { return service.questions(); }
 

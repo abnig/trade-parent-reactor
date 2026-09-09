@@ -6,6 +6,7 @@ import java.util.List;
 
 public final class RecoveryRequests {
     private RecoveryRequests() {}
+    public record ForgotUsername(@NotBlank @Email @Size(max = 254) String email) {}
     public record Answer(@Min(1) @Max(3) int questionId, @NotBlank @Size(max = 256) String answer) {
         @Override public String toString() { return "Answer[redacted]"; }
     }

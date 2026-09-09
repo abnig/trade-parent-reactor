@@ -33,6 +33,20 @@ public class PasswordRecoveryService {
     }
     public List<Question> questions() { return QUESTIONS; }
 
+    public void remindUsername(String email, String source) {
+        mail.requireConfigured();
+        rate("source:" + digest(source), 30);
+        rate("username-reminder:" + digest(email.strip().toLowerCase(Locale.ROOT)), 5);
+        repository.usernameByEmail(email.strip()).ifPresent(account -> {
+            try {
+                mail.sendUsername(account.email(), account.username());
+            } catch (Exception failure) {
+                // Keep the public result identical for matching and unknown addresses.
+                // SMTP exceptions may contain private recipient information.
+            }
+        });
+    }
+
     public Map<Integer, String> hashAnswers(List<RecoveryRequests.Answer> answers) {
         var plain = answerMap(answers);
         if (!plain.keySet().equals(Set.of(1, 2, 3))) throw invalid("Provide answers to all three recovery questions.");

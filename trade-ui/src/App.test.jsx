@@ -281,3 +281,49 @@ test('shared date picker preserves required and accessibility properties and emi
   picker.props.onChange({ target: { value: '' }, currentTarget })
   assert.equal(changed, '')
 })
+
+test('login links to a public password recovery screen', () => {
+  assert.match(render({ path: '/login' }), /href="\/reset-password">Reset password/)
+  const html = render({ path: '/reset-password' })
+  assert.match(html, /Reset password/)
+  assert.match(html, /name="username"/)
+  assert.match(html, /recovery questions/)
+  assert.match(html, /href="\/login">Back to login/)
+  assert.doesNotMatch(html, /aria-label="Portfolio"/)
+})
+
+test('login links to a public email-based username recovery form', () => {
+  const login = render({ path: '/login' })
+  assert.match(login, /class="reset-password-link" href="\/forgot-username">Forgot username/)
+  const html = render({ path: '/forgot-username' })
+  assert.match(html, /type="email"[^>]*name="email"/)
+  assert.match(html, /Send username/)
+  assert.match(html, /href="\/login">Back to login/)
+  assert.doesNotMatch(html, /name="password"|aria-label="Portfolio"/)
+})
+
+test('profile settings are available from the username control instead of the portfolio tabs', () => {
+  const html = render({ user: { id: 1, username: 'alice' }, activeTab: 'profile' })
+  assert.match(html, /<header.*class="header-profile" aria-label="alice: Profile settings" aria-current="page"/)
+  assert.match(html, /<strong>alice<\/strong><span class="header-profile-caption">Profile settings/)
+  const navigation = html.match(/<nav class="tabs".*?<\/nav>/)[0]
+  assert.doesNotMatch(navigation, /My profile|Profile settings/)
+  assert.doesNotMatch(render(), /header-profile/)
+})
+
+test('clicking the username profile control opens the profile settings', () => {
+  const calls = []
+  const view = AppView({ user: { id: 1, username: 'alice' }, checking: false, activeTab: 'brokers',
+    setActiveTab: tab => calls.push(['tab', tab]), navigate: path => calls.push(['path', path]) })
+  function findProfile(element) {
+    if (element?.props?.className === 'header-profile') return element
+    for (const child of [element?.props?.children].flat(Infinity)) {
+      if (child && typeof child === 'object') {
+        const found = findProfile(child)
+        if (found) return found
+      }
+    }
+  }
+  findProfile(view).props.onClick()
+  assert.deepEqual(calls, [['tab', 'profile'], ['path', '/']])
+})

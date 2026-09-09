@@ -183,3 +183,37 @@ test('latest fund values reject incomplete totals when a fund request fails', as
   })
   await assert.rejects(api.values.latestByFund(), /Unavailable/)
 })
+
+test('password recovery submits each step through CSRF-protected endpoints', async (t) => {
+  const calls = []
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url === '/api/auth/csrf') return new Response(JSON.stringify({ headerName: 'X-CSRF-TOKEN', token: 'test-csrf' }))
+    assert.equal(options.headers['X-CSRF-TOKEN'], 'test-csrf')
+    calls.push([url, options.method, JSON.parse(options.body)])
+    return new Response(null, { status: 204 })
+  })
+  const start = { username: 'alice' }
+  const verify = { challengeId: 'test-challenge', answers: [{ questionId: 1, answer: 'test-answer' }, { questionId: 2, answer: 'test-answer' }] }
+  const complete = { token: 'test-token', newPassword: 'test-new-password' }
+  await api.auth.startPasswordReset(start)
+  await api.auth.verifyPasswordReset(verify)
+  await api.auth.completePasswordReset(complete)
+  assert.deepEqual(calls, [
+    ['/api/auth/password-reset/challenges', 'POST', start],
+    ['/api/auth/password-reset/verify', 'POST', verify],
+    ['/api/auth/password-reset/complete', 'POST', complete]
+  ])
+})
+
+test('forgot username sends an email address with CSRF protection and returns generic confirmation', async (t) => {
+  const message = 'If an eligible account matches that email address, its username will be sent to it.'
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url === '/api/auth/csrf') return new Response(JSON.stringify({ headerName: 'X-CSRF-TOKEN', token: 'test-csrf' }))
+    assert.equal(url, '/api/auth/forgot-username')
+    assert.equal(options.method, 'POST')
+    assert.equal(options.headers['X-CSRF-TOKEN'], 'test-csrf')
+    assert.deepEqual(JSON.parse(options.body), { email: 'alice@example.com' })
+    return new Response(JSON.stringify({ message }), { status: 202 })
+  })
+  assert.deepEqual(await api.auth.forgotUsername({ email: 'alice@example.com' }), { message })
+})

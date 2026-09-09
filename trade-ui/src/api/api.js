@@ -66,6 +66,10 @@ export const api = {
     questions: () => request('/api/auth/profile/hint-questions')
   },
   auth: {
+    forgotUsername: (data) => request('/api/auth/forgot-username', { method: 'POST', body: JSON.stringify(data) }),
+    startPasswordReset: (data) => request('/api/auth/password-reset/challenges', { method: 'POST', body: JSON.stringify(data) }),
+    verifyPasswordReset: (data) => request('/api/auth/password-reset/verify', { method: 'POST', body: JSON.stringify(data) }),
+    completePasswordReset: (data) => request('/api/auth/password-reset/complete', { method: 'POST', body: JSON.stringify(data) }),
     register: (data) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
     me: () => request('/api/auth/me'),
     login: (data) => request('/api/auth/login', {

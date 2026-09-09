@@ -24,6 +24,13 @@ public class JdbcPasswordRecoveryRepository implements PasswordRecoveryRepositor
                 && rs.getBoolean("credentials_non_expired"), rs.getLong("credential_version"), rs.getLong("recovery_version"));
 
     public JdbcPasswordRecoveryRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public Optional<UsernameReminder> usernameByEmail(String email) {
+        return jdbc.query("""
+                SELECT email, username FROM users WHERE lower(email) = lower(?)
+                AND enabled = true AND account_non_locked = true AND account_non_expired = true
+                """, (rs, row) -> new UsernameReminder(rs.getString("email"), rs.getString("username")), email)
+                .stream().findFirst();
+    }
     public Optional<RecoveryAccount> account(String username) {
         return jdbc.query(ACCOUNT + " WHERE username = ?", ACCOUNT_MAPPER, username).stream().findFirst();
     }

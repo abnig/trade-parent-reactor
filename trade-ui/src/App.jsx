@@ -7,12 +7,14 @@ import Analytics from './components/Analytics'
 import AuthLinks from './components/AuthLinks'
 import Register from './components/Register'
 import Login from './components/Login'
+import ResetPassword from './components/ResetPassword'
+import ForgotUsername from './components/ForgotUsername'
 import Profile from './components/Profile'
 import api from './api/api'
 
 const tabs = [
   ['brokers', 'Broker Accounts'], ['funds', 'Mutual Funds'],
-  ['transactions', 'Transactions'], ['values', 'Fund Values'], ['analytics', 'Analytics'], ['profile', 'My profile']
+  ['transactions', 'Transactions'], ['values', 'Fund Values'], ['analytics', 'Analytics']
 ]
 
 export default function App() {
@@ -109,7 +111,16 @@ export function AppView({ user, checking, path, activeTab, error, loggingOut, na
       <header className="topbar">
         <div><div className="eyebrow">TRADE PLATFORM</div><h1>Trade Management</h1></div>
         {!checking && (user ? (
-          <div className="auth-links"><span>{user.username}</span>
+          <div className="auth-links">
+            <button type="button" className="header-profile" aria-label={`${user.username}: Profile settings`}
+              aria-current={activeTab === 'profile' ? 'page' : undefined}
+              onClick={() => { setActiveTab('profile'); navigate('/') }}>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+              </svg>
+              <span><strong>{user.username}</strong><span className="header-profile-caption">Profile settings</span></span>
+              <span aria-hidden="true">›</span>
+            </button>
             <button className="header-logout" onClick={logout} disabled={loggingOut}>{loggingOut ? 'Logging out…' : 'Logout'}</button>
           </div>
         ) : <AuthLinks registerUrl="/register" loginUrl="/login" onNavigate={navigate} />)}
@@ -135,6 +146,8 @@ export function AppView({ user, checking, path, activeTab, error, loggingOut, na
           <>
             {path === '/register' && <Register />}
             {path === '/login' && <Login onLoggedIn={loggedIn} />}
+            {path === '/reset-password' && <ResetPassword />}
+            {path === '/forgot-username' && <ForgotUsername />}
           </>
         )}
       </main>

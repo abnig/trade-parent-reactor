@@ -22,6 +22,18 @@ class SmtpResetMailSenderTest {
         assertTrue(message.getValue().getText().contains("https://trade.example.com/reset-password#token=test-token"));
         assertTrue(message.getValue().getText().contains("15 minutes"));
     }
+    @Test void sendsUsernameToStoredAddress() {
+        var factory = new DefaultListableBeanFactory();
+        var smtp = mock(JavaMailSender.class);
+        factory.registerSingleton("smtp", smtp);
+        var sender = new SmtpResetMailSender(factory.getBeanProvider(JavaMailSender.class), "recovery@example.com", "https://trade.example.com/reset-password");
+        sender.sendUsername("alice@example.com", "alice");
+        var message = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(smtp).send(message.capture());
+        assertArrayEquals(new String[]{"alice@example.com"}, message.getValue().getTo());
+        assertEquals("Your Trade Management username", message.getValue().getSubject());
+        assertTrue(message.getValue().getText().contains("username is: alice"));
+    }
     @Test void rejectsMissingMailAndUntrustedUrlForms() {
         var factory = new DefaultListableBeanFactory();
         var absent = new SmtpResetMailSender(factory.getBeanProvider(JavaMailSender.class), "recovery@example.com", "https://trade.example.com/reset-password");

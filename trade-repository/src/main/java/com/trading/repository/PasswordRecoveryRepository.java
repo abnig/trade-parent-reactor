@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Optional;
 
 public interface PasswordRecoveryRepository {
+    record UsernameReminder(String email, String username) {}
+    Optional<UsernameReminder> usernameByEmail(String email);
     Optional<RecoveryAccount> account(String username);
     Optional<RecoveryAccount> account(long userId);
     Map<Integer, String> answers(long userId);
