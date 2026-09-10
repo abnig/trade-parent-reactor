@@ -1,4 +1,5 @@
 import DateInput from './DateInput'
+import { spacedDateTicks } from './chartTicks'
 import { useEffect, useMemo, useState } from 'react'
 import api from '../api/api'
 import { historyDate, investmentHistory } from './investmentHistory'
@@ -139,7 +140,7 @@ export default function Analytics() {
    * Calculate SVG chart coordinates.
    */
   const chart = useMemo(() => {
-    const width = 1000
+    const width = Math.max(1400, investments.length * 40)
     const height = 480
 
     const margin = {
@@ -237,37 +238,7 @@ export default function Analytics() {
       }
     ).reverse()
 
-    const maxXTicks = 6
-
-    const step =
-      investmentPoints.length <= maxXTicks
-        ? 1
-        : Math.ceil(
-            investmentPoints.length / maxXTicks
-          )
-
-    const xTicks = investmentPoints
-      .map((item, index) => ({
-        ...item,
-        index
-      }))
-      .filter(
-        (item, index) =>
-          index % step === 0 ||
-          index === investmentPoints.length - 1
-      )
-      .reduce((result, item) => {
-        if (
-          !result.some(
-            (existing) =>
-              existing.index === item.index
-          )
-        ) {
-          result.push(item)
-        }
-
-        return result
-      }, [])
+    const xTicks = spacedDateTicks(investmentPoints)
 
     return {
       width,
@@ -450,10 +421,16 @@ export default function Analytics() {
             <span><i className="chart-investment-swatch" />Cumulative net investment</span>
           </div>
           <p className="chart-explanation">Net investment = BUY amounts − SELL amounts. Hover over a value marker for the date, investment, and gain/loss.</p>
-          <div className="analytics-chart-wrap">
+          <div
+            className="analytics-chart-wrap"
+            role="region"
+            aria-label="Scrollable analytics graph"
+            tabIndex={0}
+          >
 
             <svg
               className="analytics-chart"
+              style={{ minWidth: chart.width }}
               viewBox={`0 0 ${chart.width} ${chart.height}`}
               role="img"
               aria-label={`Total value and cumulative net investment trend for ${
@@ -526,7 +503,7 @@ export default function Analytics() {
               {/* X-axis date grid, markers, and labels */}
               {chart.xTicks.map((tick, index) => (
                 <g
-                  key={`${tick.valId}-${tick.index}`}
+                  key={tick.date.getTime()}
                 >
                   <line
                     x1={tick.x}

@@ -3,6 +3,22 @@ import assert from 'node:assert/strict'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { AppView } from './App'
 import { formatDisplayDate, dateRangeError, isWithinDateRange } from './utils/date'
+import { spacedDateTicks } from './components/chartTicks'
+
+test('analytics date labels stay spaced with clustered dates and a nearby final date', () => {
+  const points = [0, 10, 30, 220, 230, 450, 650, 660, 870, 878].map(x => ({ x }))
+  const ticks = spacedDateTicks(points)
+  assert.equal(ticks[0], points[0])
+  assert.equal(ticks.at(-1), points.at(-1))
+  assert.ok(ticks.length > 2)
+  ticks.slice(1).forEach((tick, index) => assert.ok(tick.x - ticks[index].x >= 220))
+  assert.equal(points.length, 10)
+})
+
+test('analytics date labels handle empty and single-date histories', () => {
+  assert.deepEqual(spacedDateTicks([]), [])
+  assert.deepEqual(spacedDateTicks([{ x: 500 }]), [{ x: 500 }])
+})
 
 test('formats analytics, transaction, and fund value dates as DD-Mon-YYYY', () => {
   assert.equal(formatDisplayDate('2026-09-08T15:30:00Z'), '08-Sep-2026')

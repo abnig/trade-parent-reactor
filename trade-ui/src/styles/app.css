@@ -242,13 +242,19 @@ tbody tr:last-child td { border-bottom: 0; }
 
 .analytics-chart-wrap {
   width: 100%;
-  overflow-x: auto;
+  overflow-x: scroll;
+  padding-bottom: 12px;
+}
+
+.analytics-chart-wrap:focus-visible {
+  outline: 2px solid #162033;
+  outline-offset: 3px;
 }
 
 .analytics-chart {
   display: block;
   width: 100%;
-  min-width: 700px;
+  min-width: 1000px;
   height: auto;
 }
 
@@ -364,9 +370,6 @@ tbody tr:last-child td { border-bottom: 0; }
     width: 100%;
   }
 
-  .analytics-chart {
-    min-width: 620px;
-  }
 }
 
 
@@ -376,9 +379,6 @@ tbody tr:last-child td { border-bottom: 0; }
     padding: 14px;
   }
 
-  .analytics-chart {
-    min-width: 560px;
-  }
 
   .analytics-empty {
     padding: 35px 20px;
