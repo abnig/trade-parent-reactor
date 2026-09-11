@@ -46,6 +46,7 @@ const queryUrl = (path, parameters) => {
 
 export const api = {
   analytics: {
+    portfolio: ({ fromDate, toDate } = {}) => request(queryUrl('/api/analytics/portfolio', { fromDate, toDate })),
     funds: () => request('/api/analytics/funds'),
     valueHistory: (fundId) => request(`/api/analytics/funds/${encodeURIComponent(fundId)}/values`),
     transactionHistory: async (fundId) => {

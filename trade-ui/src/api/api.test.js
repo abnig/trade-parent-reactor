@@ -2,6 +2,25 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import api from './api.js'
 
+test('portfolio analytics uses one authenticated aggregate request with optional date filters', async (t) => {
+  const urls = []
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    urls.push(url)
+    assert.equal(options.credentials, 'same-origin')
+    assert.equal(options.method, 'GET')
+    return new Response(JSON.stringify({ totalValue: 400, funds: [{ mutualFundId: 1 }, { mutualFundId: 2 }] }))
+  })
+  assert.equal((await api.analytics.portfolio({ fromDate: '2026-02-01', toDate: '2026-02-28', ownerId: 2 })).totalValue, 400)
+  assert.deepEqual(urls, ['/api/analytics/portfolio?fromDate=2026-02-01&toDate=2026-02-28'])
+  await api.analytics.portfolio()
+  assert.equal(urls[1], '/api/analytics/portfolio')
+})
+
+test('portfolio aggregation failures surface instead of returning partial totals', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ message: 'Portfolio unavailable' }), { status: 500 }))
+  await assert.rejects(api.analytics.portfolio(), /Portfolio unavailable/)
+})
+
 test('analytics loads every transaction page for the selected fund', async (t) => {
   const urls = []
   t.mock.method(globalThis, 'fetch', async (url) => {

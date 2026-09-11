@@ -595,3 +595,26 @@ tbody tr:last-child td { border-bottom: 0; }
 
 .profile-hint-toggle { display: flex; align-items: center; gap: 10px; }
 .profile-hint-toggle input { width: auto; margin: 0; }
+
+.analytics-metrics { margin: 0 0 24px; }
+.analytics-metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 12px; }
+.analytics-metrics-grid > div { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; min-width: 0; }
+.analytics-metrics dt { color: #64748b; font-size: 0.875rem; }
+.analytics-metrics dd { margin: 8px 0 0; font-size: 1.3rem; font-weight: 700; overflow-wrap: anywhere; }
+.analytics-metrics p { color: #64748b; font-size: 0.875rem; line-height: 1.5; }
+
+.analytics-view-selector { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.analytics-view-selector button { border: 1px solid #ccd3df; border-radius: 8px; padding: 10px 16px; background: white; color: #344054; }
+.analytics-view-selector button[aria-pressed="true"] { background: #162033; color: white; border-color: #162033; }
+.analytics-view-selector button:focus-visible, .analytics-detail-table:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+.analytics-detail-chart { display: block; width: 100%; height: auto; }
+.analytics-detail-table { margin-top: 18px; }
+.analytics-detail-table caption { padding: 14px 16px; text-align: left; font-weight: 650; }
+.analytics-detail-table th[scope="row"] { background: white; text-transform: none; letter-spacing: normal; }
+.analytics-detail-empty { padding: 20px 0; color: #64748b; }
+.portfolio-share { display: flex; flex-direction: column; gap: 5px; min-width: 90px; }
+.portfolio-share meter { width: 100%; height: 12px; accent-color: #2563eb; }
+.portfolio-data-note { background: #f1f5f9; border-left: 3px solid #64748b; padding: 12px; }
+.portfolio-date-note { display: block; margin-top: 5px; color: #64748b; }
+.portfolio-analytics td { white-space: nowrap; }
+.portfolio-analytics .analytics-detail-table { margin-bottom: 22px; }

@@ -5,16 +5,8 @@ export const historyDate = parseCalendarDate
 
 export function investmentHistory(transactions, fundId, valueDates, fromDate = '', toDate = '') {
   const changes = new Map()
-  for (const transaction of transactions) {
-    if (String(transaction.mutualFundId) !== String(fundId)) continue
-    const time = historyDate(transaction.txnDate).getTime()
-    const amount = Number(transaction.amount)
-    if (!Number.isFinite(time) || !Number.isFinite(amount) ||
-        !['BUY', 'SELL'].includes(transaction.transactionType)) {
-      throw new Error('Investment history contains an invalid transaction.')
-    }
-    const change = transaction.transactionType === 'SELL' ? -Math.abs(amount) : amount
-    changes.set(time, (changes.get(time) || 0) + change)
+  for (const transaction of normalizedTransactions(transactions, fundId)) {
+    changes.set(transaction.time, (changes.get(transaction.time) || 0) + transaction.change)
   }
   const times = [...new Set([...changes.keys(), ...valueDates.map(date => date.getTime())])].sort((a, b) => a - b)
   let invested = 0
@@ -25,4 +17,17 @@ export function investmentHistory(transactions, fundId, valueDates, fromDate = '
     invested += changes.get(time) || 0
     return { date: new Date(time), invested }
   }).filter(point => point.date.getTime() >= fromTime && point.date.getTime() <= toTime)
+}
+
+// Shared validation and signed cash flows for both the chart and summary.
+export function normalizedTransactions(transactions, fundId) {
+  return transactions.filter(item => String(item.mutualFundId) === String(fundId)).map(item => {
+    const time = historyDate(item.txnDate).getTime()
+    const amount = Number(item.amount)
+    if (!Number.isFinite(time) || item.amount == null || String(item.amount).trim() === '' ||
+        !Number.isFinite(amount) || !['BUY', 'SELL'].includes(item.transactionType)) {
+      throw new Error('Investment history contains an invalid transaction.')
+    }
+    return { ...item, time, amount, change: item.transactionType === 'SELL' ? -Math.abs(amount) : amount }
+  }).sort((a, b) => a.time - b.time)
 }

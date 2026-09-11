@@ -2,8 +2,12 @@ import DateInput from './DateInput'
 import { spacedDateTicks } from './chartTicks'
 import { useEffect, useMemo, useState } from 'react'
 import api from '../api/api'
-import { historyDate, investmentHistory } from './investmentHistory'
-import { formatDisplayDate, dateRangeError, isWithinDateRange } from '../utils/date'
+import { investmentHistory } from './investmentHistory'
+import { analyticsSummary, valueHistory } from './analyticsMetrics'
+import AnalyticsSummary from './AnalyticsSummary'
+import PortfolioAnalytics, { PORTFOLIO_SELECTION } from './PortfolioAnalytics'
+import AnalyticsDetails, { AnalyticsResults, AnalyticsViewSelector } from './AnalyticsDetails'
+import { formatDisplayDate, dateRangeError } from '../utils/date'
 
 
 const formatValue = (value) =>
@@ -39,6 +43,7 @@ export default function Analytics() {
   const [toDate, setToDate] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [view, setView] = useState('value')
   const rangeError = dateRangeError(fromDate, toDate)
 
   useEffect(() => {
@@ -65,9 +70,13 @@ export default function Analytics() {
 
   useEffect(() => {
     let active = true
-    if (!selectedFundId) {
+    if (!selectedFundId || selectedFundId === PORTFOLIO_SELECTION) {
       setValues([])
       setTransactions([])
+      if (selectedFundId === PORTFOLIO_SELECTION) {
+        setError('')
+        setLoading(false)
+      }
       return () => { active = false }
     }
 
@@ -101,36 +110,11 @@ export default function Analytics() {
       String(fund.mutualFundId) === String(selectedFundId)
   )
 
-  /*
-   * Get values for the selected mutual fund
-   * and sort them by Value As Of date ascending.
-   */
-  const chartData = useMemo(() => {
-    if (!selectedFundId) {
-      return []
-    }
+  const chartData = useMemo(() => valueHistory(values, selectedFundId, fromDate, toDate),
+    [values, selectedFundId, fromDate, toDate])
 
-    return values
-      .filter(
-        (item) =>
-          String(item.mutualFundId) === String(selectedFundId)
-      )
-      .map((item) => ({
-        ...item,
-        date: historyDate(item.valueAsOfDate),
-        value: Number(item.totalValue)
-      }))
-      .filter(
-        (item) =>
-          !Number.isNaN(item.date.getTime()) &&
-          Number.isFinite(item.value) &&
-          isWithinDateRange(item.valueAsOfDate, fromDate, toDate)
-      )
-      .sort(
-        (a, b) =>
-          a.date.getTime() - b.date.getTime()
-      )
-  }, [values, selectedFundId, fromDate, toDate])
+  const summary = useMemo(() => analyticsSummary(transactions, values, selectedFundId, fromDate, toDate),
+    [transactions, values, selectedFundId, fromDate, toDate])
 
   const investments = useMemo(() => investmentHistory(
     transactions, selectedFundId, chartData.map(item => item.date), fromDate, toDate
@@ -270,13 +254,12 @@ export default function Analytics() {
         <div>
           <h2>Analytics</h2>
           <p>
-            View the historical value trend
-            for a mutual fund.
+            Explore value history, cash flows, and holdings for a mutual fund.
           </p>
         </div>
       </div>
 
-      {error && (
+      {error && selectedFundId !== PORTFOLIO_SELECTION && (
         <div className="error">
           {error}
         </div>
@@ -299,6 +282,7 @@ export default function Analytics() {
             <option value="">
               Select Mutual Fund
             </option>
+            <option value={PORTFOLIO_SELECTION}>All funds — Portfolio</option>
 
             {funds.map((fund) => (
               <option
@@ -336,30 +320,18 @@ export default function Analytics() {
         <div id="date-range-error" className="error" role="alert">{rangeError}</div>
       )}
 
-      {/* No fund selected */}
-      {!selectedFundId ? (
-        <div className="analytics-empty">
-          <h3>
-            Select a mutual fund
-          </h3>
+      {selectedFundId === PORTFOLIO_SELECTION ? (
+        rangeError ? <div className="analytics-empty"><h3>Invalid date range</h3><p>{rangeError}</p></div> :
+          <PortfolioAnalytics key={`${fromDate}:${toDate}`} fromDate={fromDate} toDate={toDate}
+            onSelectFund={fundId => { setSelectedFundId(String(fundId)); setView('value') }} />
+      ) : (
+      <AnalyticsResults fundId={selectedFundId} loading={loading} error={error} rangeError={rangeError}>
+        <AnalyticsSummary summary={summary} fromDate={fromDate} toDate={toDate} />
+        <AnalyticsViewSelector view={view} onChange={setView} />
 
-          <p>
-            Choose a mutual fund above
-            to view its value history.
-          </p>
-        </div>
-
-      ) : loading ? (
-        <div className="analytics-empty" role="status">Loading value history…</div>
-
-      ) : error ? (
-        <div className="analytics-empty">Value history could not be loaded. Please try again.</div>
-
-      ) : rangeError ? (
-        <div className="analytics-empty">
-          <h3>Invalid date range</h3>
-          <p>{rangeError}</p>
-        </div>
+        {view !== 'value' ? (
+        <AnalyticsDetails view={view}
+          transactions={transactions} values={values} fundId={selectedFundId} fromDate={fromDate} toDate={toDate} />
 
       ) : chartData.length === 0 ? (
 
@@ -372,7 +344,7 @@ export default function Analytics() {
           <p>
             {selectedFund?.mutualFundName ||
               'The selected fund'}{' '}
-            has no fund values to plot.
+            has no fund values to plot in the selected range.
           </p>
         </div>
 
@@ -618,6 +590,8 @@ export default function Analytics() {
             </svg>
           </div>
         </div>
+        )}
+      </AnalyticsResults>
       )}
     </section>
   )

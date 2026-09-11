@@ -4,6 +4,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { AppView } from './App'
 import { formatDisplayDate, dateRangeError, isWithinDateRange } from './utils/date'
 import { spacedDateTicks } from './components/chartTicks'
+import './components/AnalyticsDetails.test'
+import './components/PortfolioAnalytics.test'
 
 test('analytics date labels stay spaced with clustered dates and a nearby final date', () => {
   const points = [0, 10, 30, 220, 230, 450, 650, 660, 870, 878].map(x => ({ x }))
@@ -342,4 +344,109 @@ test('clicking the username profile control opens the profile settings', () => {
   }
   findProfile(view).props.onClick()
   assert.deepEqual(calls, [['tab', 'profile'], ['path', '/']])
+})
+
+import { analyticsSummary, formatMetric, valueHistory } from './components/analyticsMetrics'
+import AnalyticsSummary from './components/AnalyticsSummary'
+
+const analyticsTxn = (txnDate, amount, units, transactionType = 'BUY', mutualFundId = 1) =>
+  ({ txnDate, amount, units, transactionType, mutualFundId })
+const analyticsValue = (valueAsOfDate, totalValue, mutualFundId = 1) =>
+  ({ valueAsOfDate, totalValue, mutualFundId })
+
+test('summary separates opening balance, cumulative holdings, and inclusive range activity', () => {
+  const summary = analyticsSummary([
+    analyticsTxn('2026-01-01', 100, 10),
+    analyticsTxn('2026-02-01', 50, 5),
+    analyticsTxn('2026-02-28', -30, 3, 'SELL'),
+    analyticsTxn('2026-03-01', 999, 99),
+    analyticsTxn('2026-02-01', 999, 99, 'BUY', 2)
+  ], [analyticsValue('2026-03-01', 999), analyticsValue('2026-02-28', 150),
+    analyticsValue('2026-02-28', 999, 2)], '1', '01-Feb-2026', '28-Feb-2026')
+  assert.equal(summary.openingInvestment, 100)
+  assert.equal(summary.netInvestment, 120)
+  assert.equal(summary.latestValue, 150)
+  assert.equal(summary.gainLoss, 30)
+  assert.equal(summary.returnPercentage, 25)
+  assert.equal(summary.units, 12)
+  assert.equal(summary.totalBought, 50)
+  assert.equal(summary.totalSold, 30)
+  assert.equal(summary.transactionCount, 2)
+  assert.equal(summary.hasLaterTransactions, false)
+})
+
+test('empty activity carries investment and units forward even with no snapshot', () => {
+  const summary = analyticsSummary([analyticsTxn('2026-01-01', 100, 10)],
+    [analyticsValue('2026-01-01', 110)], 1, '01-Feb-2026', '28-Feb-2026')
+  assert.equal(summary.netInvestment, 100)
+  assert.equal(summary.openingInvestment, 100)
+  assert.equal(summary.units, 10)
+  assert.equal(summary.transactionCount, 0)
+  assert.equal(summary.totalBought, 0)
+  assert.equal(summary.totalSold, 0)
+  assert.equal(summary.latestValue, null)
+  assert.equal(summary.gainLoss, null)
+  assert.equal(summary.returnPercentage, null)
+  const withSnapshot = analyticsSummary([analyticsTxn('2026-01-01', 100, 10)],
+    [analyticsValue('2026-02-10', 120)], 1, '01-Feb-2026', '28-Feb-2026')
+  assert.equal(withSnapshot.returnPercentage, 20)
+})
+
+test('same-day BUY and SELL ordering does not change summary or unit reliability', () => {
+  const transactions = [analyticsTxn('2026-02-01', 30, 3, 'SELL'), analyticsTxn('2026-02-01', 100, 10)]
+  const summary = analyticsSummary(transactions, [], 1)
+  assert.equal(summary.units, 7)
+  assert.equal(summary.netInvestment, 70)
+  assert.deepEqual(summary, analyticsSummary([...transactions].reverse(), [], 1))
+})
+
+test('zero and negative investment have no percentage return', () => {
+  for (const sold of [100, 150]) {
+    const summary = analyticsSummary([analyticsTxn('2026-01-01', 100, 10),
+      analyticsTxn('2026-02-01', sold, 10, 'SELL')], [analyticsValue('2026-02-01', 0)], 1)
+    assert.equal(summary.netInvestment, 100 - sold)
+    assert.equal(summary.gainLoss, sold - 100)
+    assert.equal(summary.returnPercentage, null)
+    assert.equal(summary.units, 0)
+  }
+})
+
+test('missing, invalid, and historically negative units are unavailable', () => {
+  for (const units of [null, undefined, '', 0, -1, 'bad']) {
+    assert.equal(analyticsSummary([analyticsTxn('2026-01-01', 100, units)], [], 1).units, null)
+  }
+  assert.equal(analyticsSummary([analyticsTxn('2026-01-01', 100, 10, 'SELL'),
+    analyticsTxn('2026-02-01', 200, 20)], [], 1).units, null)
+  assert.equal(analyticsSummary([], [], 1).units, null)
+})
+
+test('snapshot selection ignores missing or invalid values and flags later cash flows', () => {
+  const values = [analyticsValue('2026-01-01', 100), analyticsValue('2026-02-01', null),
+    analyticsValue('2026-02-02', ''), analyticsValue('bad', 999), analyticsValue('2026-02-03', 'bad')]
+  assert.equal(valueHistory(values, 1).length, 1)
+  const summary = analyticsSummary([analyticsTxn('2026-01-02', 80, 8)], values, 1)
+  assert.equal(summary.latestValue, 100)
+  assert.equal(summary.gainLoss, 20)
+  assert.equal(summary.hasLaterTransactions, true)
+  assert.equal(analyticsSummary([], [], 1).latestValue, null)
+  assert.throws(() => analyticsSummary([analyticsTxn('2026-01-01', null, 10)], [], 1), /invalid transaction/)
+})
+
+test('summary formats metrics and explains opening balances and snapshot timing', () => {
+  assert.equal(formatMetric(12.3456), (12.35).toLocaleString(undefined, { minimumFractionDigits: 2 }))
+  assert.equal(formatMetric(12.3456, 3), (12.346).toLocaleString(undefined, { minimumFractionDigits: 3 }))
+  assert.equal(formatMetric(-0.0001), '0.00')
+  assert.equal(formatMetric(null), 'Unavailable')
+  const summary = analyticsSummary([analyticsTxn('2026-01-01', 100, 10), analyticsTxn('2026-02-20', 20, 2)],
+    [analyticsValue('2026-02-10', 150)], 1, '01-Feb-2026', '28-Feb-2026')
+  const html = renderToStaticMarkup(<AnalyticsSummary summary={summary} fromDate="01-Feb-2026" toDate="28-Feb-2026" />)
+  assert.match(html, /Cumulative net investment/)
+  assert.match(html, /Opening net investment before 01-Feb-2026: 100.00/)
+  assert.match(html, /Latest snapshot: 10-Feb-2026/)
+  assert.match(html, /Transactions after the snapshot/)
+  assert.match(html, /25.00%/)
+  const empty = renderToStaticMarkup(<AnalyticsSummary summary={analyticsSummary([], [], 1)} />)
+  assert.match(empty, /No value snapshot in the selected range/)
+  assert.match(empty, /Unavailable/)
+  assert.doesNotMatch(empty, /NaN|Infinity/)
 })

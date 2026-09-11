@@ -157,3 +157,101 @@ mvn -pl trade-rest -am test
 
 Each phase should be released only after its calculations are verified against
 hand-worked examples and its empty/loading/error states are covered.
+
+## Phase 1 calculation conventions
+
+- Summary investment and units include recorded history through the selected
+  end date, or all loaded transactions when no end date is selected. BUY/SELL
+  activity totals and counts include only the selected range, inclusively.
+- Latest value uses the most recent valid snapshot inside the selected range.
+  Without a snapshot, investment and activity remain visible while value,
+  gain/loss, and return are unavailable.
+- Gain/loss subtracts cumulative net investment from that snapshot value. The
+  snapshot date is displayed, and a notice identifies comparisons that include
+  transactions after the snapshot. This is a simple recorded-data comparison.
+- Percentage return is unavailable for zero or negative net investment.
+- Units require positive, finite units on every included transaction and no
+  negative end-of-day balance. Same-day BUY/SELL order does not affect this
+  check. Missing history or unreliable unit records produce an unavailable
+  balance; no units are inferred from amounts or average prices.
+
+## Phase 2 calculation conventions
+
+- The view selector preserves value history and adds cash flows, holdings, and
+  transaction activity using the same complete fund history and date filters.
+- Cash flows can be grouped by calendar month or quarter. BUY adds investment,
+  SELL is an outflow, and net flow is BUY minus SELL. Empty periods contain
+  zero recorded flow after history has loaded successfully; failed or pending
+  requests never display fabricated zero totals. Boundary periods include only
+  the selected dates and show their actual included dates in the table.
+- Unspecified range endpoints use the earliest/latest recorded transaction or
+  valid value snapshot. If only an explicit endpoint exists outside the history,
+  the other endpoint is clamped to it. With no dated history or date filters,
+  the cash-flow view asks for a date range rather than inventing an extent.
+- Holdings show end-of-day balances at transaction dates, snapshot dates, and
+  range boundaries. Earlier transactions establish the opening balance; dates
+  without activity carry it forward. No value snapshots are required.
+- Average cost uses a moving weighted average of recorded BUY amounts and
+  units. Sales remove units and their cost at that average; sale proceeds do
+  not alter average cost. Same-day purchases are pooled before same-day sales
+  because the available calendar dates do not establish intraday order. This
+  is a documented estimate, not a tax cost basis.
+- A full exit shows zero units and unavailable average cost; a later purchase
+  starts a new cost pool. Missing/nonpositive units or a negative historical
+  balance make subsequent holdings unavailable. Negative BUY amounts also
+  make average cost unavailable. Missing balances are chart gaps, not zeros.
+- The transaction table is newest first, with transaction ID breaking same-day
+  ties, and paginates the already loaded history. Charts include accessible
+  tables with exact formatted values and scroll within their containers.
+
+## Phase 3 implementation and API
+
+`GET /api/analytics/portfolio` accepts optional `fromDate` and `toDate` in
+`YYYY-MM-DD` format. Invalid dates, reversed ranges, and other query parameters
+(including ownership overrides) return HTTP 400. Authentication is required;
+the owner always comes from the authenticated session.
+
+The endpoint returns one aggregate response with `asOfDate`, `totalValue`,
+`knownValueTotal`, `totalInvested`, `totalBought`, `gainLoss`,
+`returnPercentage`, `fundCount`, `valuedFundCount`, `funds`, and
+`brokerAccounts`. Fund entries include their identifiers and names, broker
+account, snapshot date, last transaction date, net investment, cumulative BUY
+amount, value, gain/loss, return, allocation percentage, and contribution
+percentage. Broker entries include account identity, total/known value, net
+investment, coverage counts, and allocation percentage. Amounts and percentages
+are calculated with BigDecimal; percentages retain six decimal places in the
+API and display two in the UI.
+
+- The All funds option is optional; selecting a fund or its View fund button
+  returns to the existing fund analytics with the same date filters.
+- One owner-scoped SQL statement aggregates transactions per fund and selects
+  one latest snapshot per fund before joining them. This avoids duplicate
+  totals, requests per fund, and inconsistent reads between portfolio totals.
+- Like phase 1, net investment includes all transactions through the end date,
+  including opening transactions before the start date. With no end date, it
+  includes all recorded transactions. Snapshots must be inside the selected
+  range; the latest calendar date and then highest value ID win, matching fund
+  analytics. The comparison date is the selected end date or the latest
+  included transaction/snapshot date, not a claim that every fund was valued
+  on that date. Each fund shows its own snapshot date and later cash-flow date.
+- Total value and portfolio gain/loss are unavailable if any owned fund has no
+  snapshot in the range. `knownValueTotal` separately sums available snapshots.
+  Broker totals follow the same completeness rule within each account. Funds
+  without transactions have zero investment; missing snapshots remain null.
+- Allocation is fund or broker value divided by the complete portfolio value.
+  It is unavailable for missing or negative values and for a nonpositive total.
+  Broker accounts and funds are grouped by their IDs, never by display names.
+- Contribution share is a fund's cumulative BUY amount divided by cumulative
+  BUY amounts across all owned funds. It measures recorded purchase
+  contributions, not current value or net investment. It is unavailable when
+  total BUY amounts are zero or any fund has negative total BUY amounts.
+- Returns use gain/loss divided by positive net investment. Zero or negative
+  investment yields an unavailable return. Unknown transaction types fail the
+  request instead of being silently treated as zero cash flow.
+- A portfolio with no owned funds returns empty lists and zero monetary totals,
+  and the UI shows an empty state. Loading/failure states never expose stale
+  totals; failures provide a retry control.
+
+The PostgreSQL version of the portfolio tests runs only when
+`ANALYTICS_TEST_POSTGRES_URL` points to a disposable local database named
+`analytics_test`; it resets that database's public schema before each test.
