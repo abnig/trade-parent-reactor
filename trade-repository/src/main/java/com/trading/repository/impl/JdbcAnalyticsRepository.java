@@ -146,7 +146,7 @@ public class JdbcAnalyticsRepository implements AnalyticsRepository {
                     fund.valueAsOfDate(), fund.lastTransactionDate(), fundGain, percentage(fundGain, fund.totalInvested()),
                     percentage(fund.totalValue(), allocationBase), percentage(fund.totalBought(), nonnegativePurchases ? bought : null));
             funds.add(result);
-            byBroker.computeIfAbsent(fund.brokerAccountId(), ignored -> new ArrayList<>()).add(result);
+            byBroker.computeIfAbsent(fund.brokerAccountId(), _ -> new ArrayList<>()).add(result);
         }
         var brokers = new ArrayList<PortfolioAnalytics.BrokerAccount>();
         for (var brokerFunds : byBroker.values()) {

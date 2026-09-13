@@ -25,8 +25,8 @@ public class MutualFundRepositoryImpl implements MutualFundRepository {
 
         String sql = """
                 INSERT INTO mutual_fund
-                    (broker_account_id, mutual_fund_name)
-                VALUES (?, ?)
+                    (broker_account_id, mutual_fund_name, isin, plan)
+                VALUES (?, ?, ?, ?)
                 RETURNING mutual_fund_id
                 """;
 
@@ -34,7 +34,9 @@ public class MutualFundRepositoryImpl implements MutualFundRepository {
                 sql,
                 Long.class,
                 mutualFund.getBrokerAccountId(),
-                mutualFund.getMutualFundName()
+                mutualFund.getMutualFundName(),
+                mutualFund.getIsin(),
+                mutualFund.getPlan()
         );
 
         mutualFund.setMutualFundId(generatedId);
@@ -49,7 +51,7 @@ public class MutualFundRepositoryImpl implements MutualFundRepository {
         String sql = """
                 SELECT mutual_fund_id,
                        broker_account_id,
-                       mutual_fund_name,
+                       mutual_fund_name, isin, plan,
                        create_date,
                        update_date
                 FROM mutual_fund
@@ -72,7 +74,7 @@ public class MutualFundRepositoryImpl implements MutualFundRepository {
         String sql = """
                 SELECT mutual_fund_id,
                        broker_account_id,
-                       mutual_fund_name,
+                       mutual_fund_name, isin, plan,
                        create_date,
                        update_date
                 FROM mutual_fund
@@ -93,7 +95,7 @@ public class MutualFundRepositoryImpl implements MutualFundRepository {
         String sql = """
                 SELECT mutual_fund_id,
                        broker_account_id,
-                       mutual_fund_name,
+                       mutual_fund_name, isin, plan,
                        create_date,
                        update_date
                 FROM mutual_fund
@@ -125,6 +127,8 @@ public class MutualFundRepositoryImpl implements MutualFundRepository {
                 UPDATE mutual_fund
                 SET broker_account_id = ?,
                     mutual_fund_name = ?,
+                    isin = COALESCE(?, isin),
+                    plan = COALESCE(?, plan),
                     update_date = CURRENT_TIMESTAMP
                 WHERE mutual_fund_id = ?
                 """;
@@ -133,6 +137,8 @@ public class MutualFundRepositoryImpl implements MutualFundRepository {
                 sql,
                 mutualFund.getBrokerAccountId(),
                 mutualFund.getMutualFundName(),
+                mutualFund.getIsin(),
+                mutualFund.getPlan(),
                 mutualFund.getMutualFundId()
         );
 
@@ -155,6 +161,8 @@ public class MutualFundRepositoryImpl implements MutualFundRepository {
             throws java.sql.SQLException {
 
         MutualFund mutualFund = new MutualFund();
+        mutualFund.setIsin(rs.getString("isin"));
+        mutualFund.setPlan(rs.getString("plan"));
 
         mutualFund.setMutualFundId(
                 rs.getLong("mutual_fund_id")

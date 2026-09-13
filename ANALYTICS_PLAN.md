@@ -252,6 +252,7 @@ API and display two in the UI.
   and the UI shows an empty state. Loading/failure states never expose stale
   totals; failures provide a retry control.
 
-The PostgreSQL version of the portfolio tests runs only when
-`ANALYTICS_TEST_POSTGRES_URL` points to a disposable local database named
-`analytics_test`; it resets that database's public schema before each test.
+The PostgreSQL portfolio tests run in every normal Maven build. Testcontainers
+provisions an isolated PostgreSQL 16 database named `analytics_test`; the suite
+resets its public schema before each test. Docker must be running. No database
+URL environment variable is required, and startup failures fail the build.

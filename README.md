@@ -27,6 +27,7 @@ trade-parent-reactor/
 ├── trade-rest/              Spring MVC mutual-fund REST API and tests
 ├── trade-batch/             Spring Batch CSV import applications
 ├── trade-mcp-server/        Spring AI MCP server, tools, resources and configuration
+├── trade-coverage/          Reporting-only aggregate JaCoCo coverage module
 └── trade-ui/                Independent React/Vite SPA
 ```
 
@@ -487,7 +488,57 @@ reconcile the schema and migration history with those scripts; simply enabling i
 will not record manually executed migrations or resolve the earlier missing-history
 error.
 
-Verification commands:
+Verification commands (start Docker Desktop or a compatible Docker daemon first):
+
+```bash
+mvn clean verify
+```
+
+Normal Maven builds run all backend tests, including the PostgreSQL suites.
+Testcontainers automatically starts an isolated PostgreSQL 16 container for each
+suite and removes it when the test JVM exits. No test database URLs or manual
+SQL setup are needed; former `*_TEST_POSTGRES_URL` variables are no longer used.
+An unavailable Docker runtime causes test failures, not skipped tests. The first
+run needs access to the container registry to download uncached images. Maven
+skip flags default to false; explicit command-line overrides still work.
+Frontend checks remain separate from the Maven lifecycle.
+
+The parent POM generates a separate HTML Surefire report for every Maven module
+at `<module>/target/site/surefire-report.html` during the `test` phase. This also
+runs as part of `mvn package` and `mvn clean verify`. Modules without tests receive
+an empty report; the parent reactor receives its own empty report. XML/text test
+results remain in `<module>/target/surefire-reports`. Generated reports stay under
+the Git-ignored `target` directories.
+
+If a test fails, Maven stops before that module's HTML reporting step. Generate
+HTML from the existing results without rerunning tests or clearing `target`:
+
+```bash
+mvn surefire-report:report-only
+```
+
+JaCoCo 0.8.15 collects Java code coverage during tests and generates HTML and XML
+reports in the `verify` phase. Run `mvn clean verify` from the reactor root with
+Docker running to execute all tests and create coverage reports:
+
+- Combined HTML: `trade-coverage/target/site/jacoco-aggregate/index.html`.
+- Combined XML: `trade-coverage/target/site/jacoco-aggregate/jacoco.xml`.
+- Module drilldowns: `trade-coverage/target/site/jacoco-aggregate/<module>/index.html`.
+- Local module HTML/XML (when that module runs tests):
+  `<module>/target/site/jacoco/index.html` and `jacoco.xml`.
+- Raw execution data: `<module>/target/jacoco.exec`.
+
+`trade-coverage` is a POM-only reporting module, ordered after all five application
+modules. Its report includes coverage of model and repository code exercised by
+REST tests. Modules without their own tests may have no local JaCoCo report, but
+all five modules appear in the combined report; unexercised code remains visible
+as uncovered. These missing local execution files do not mean tests were skipped.
+No coverage thresholds or application-class exclusions are configured. Coverage
+applies to Java code; React coverage is not collected by JaCoCo. Use a clean build
+to avoid including stale execution data. `mvn test` and `mvn package` collect data
+but do not run the `verify`-phase coverage reports.
+
+For focused REST and frontend verification:
 
 ```bash
 mvn -pl trade-rest -am clean test

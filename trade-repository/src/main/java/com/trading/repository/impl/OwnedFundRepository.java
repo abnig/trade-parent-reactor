@@ -32,16 +32,16 @@ final class OwnedFundRepository extends OwnedPortfolioJdbc implements MutualFund
 
     @Override
     public MutualFund save(MutualFund item) {
-        long id = insert("INSERT INTO mutual_fund (broker_account_id, mutual_fund_name) SELECT :broker_account_id, :mutual_fund_name WHERE " + brokerOwned(":broker_account_id"),
-                parameters().addValue("broker_account_id", item.getBrokerAccountId()).addValue("mutual_fund_name", item.getMutualFundName()), "mutual_fund_id");
+        long id = insert("INSERT INTO mutual_fund (broker_account_id, mutual_fund_name, isin, plan) SELECT :broker_account_id, :mutual_fund_name, :isin, :plan WHERE " + brokerOwned(":broker_account_id"),
+                parameters().addValue("broker_account_id", item.getBrokerAccountId()).addValue("mutual_fund_name", item.getMutualFundName()).addValue("isin", item.getIsin()).addValue("plan", item.getPlan()), "mutual_fund_id");
         item.setMutualFundId(id);
         return findById(id);
     }
 
     @Override
     public MutualFund update(MutualFund item) {
-        int rows = jdbc.update("UPDATE mutual_fund SET broker_account_id = :broker_account_id, mutual_fund_name = :mutual_fund_name, update_date = CURRENT_TIMESTAMP WHERE mutual_fund_id = :id AND " + scope() + " AND " + brokerOwned(":broker_account_id"),
-                parameters().addValue("broker_account_id", item.getBrokerAccountId()).addValue("mutual_fund_name", item.getMutualFundName()).addValue("id", item.getMutualFundId()));
+        int rows = jdbc.update("UPDATE mutual_fund SET broker_account_id = :broker_account_id, mutual_fund_name = :mutual_fund_name, isin = COALESCE(:isin, isin), plan = COALESCE(:plan, plan), update_date = CURRENT_TIMESTAMP WHERE mutual_fund_id = :id AND " + scope() + " AND " + brokerOwned(":broker_account_id"),
+                parameters().addValue("broker_account_id", item.getBrokerAccountId()).addValue("mutual_fund_name", item.getMutualFundName()).addValue("isin", item.getIsin()).addValue("plan", item.getPlan()).addValue("id", item.getMutualFundId()));
         requireUpdated(rows);
         return findById(item.getMutualFundId());
     }
@@ -69,6 +69,8 @@ final class OwnedFundRepository extends OwnedPortfolioJdbc implements MutualFund
             throws java.sql.SQLException {
 
         MutualFund mutualFund = new MutualFund();
+        mutualFund.setIsin(rs.getString("isin"));
+        mutualFund.setPlan(rs.getString("plan"));
 
         mutualFund.setMutualFundId(
                 rs.getLong("mutual_fund_id")

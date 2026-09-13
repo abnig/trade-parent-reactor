@@ -42,7 +42,7 @@ class UserProfileTest {
 
     @BeforeEach void seed() throws Exception {
         resetSchema();
-        for (String file : List.of("V3__application_schema.sql", "V5__create_app_user.sql", "V6__portfolio_ownership.sql", "V7__password_recovery.sql", "V8__user_profile_hint.sql")) {
+        for (String file : List.of("V3__application_schema.sql", "V5__create_app_user.sql", "V6__portfolio_ownership.sql", "V7__password_recovery.sql", "V8__user_profile_hint.sql", "V9__mutual_fund_orders.sql")) {
             String sql = adaptMigration(new ClassPathResource("db/migration/" + file).getContentAsString(StandardCharsets.UTF_8));
             for (String statement : sql.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
         }

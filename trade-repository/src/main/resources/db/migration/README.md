@@ -33,3 +33,9 @@ disabled, record manual application of V7 along with V5/V6. See
 case-insensitive unique email index. Check and resolve existing case-insensitive
 email duplicates before applying it. Apply the script atomically after V7; see
 [profile migration and API documentation](../../../../../../user-profile-management.md).
+
+`V9__mutual_fund_orders.sql` adds optional fund ISIN/plan, widens transaction
+units/NAV to six decimal places, and creates owner-linked mutual-fund order
+history separately from completed transactions. Apply after V8 before running
+the updated fund repositories. It performs no historical backfill. See
+[Coin order field mapping and persistence notes](../../../../../../coin-order-schema.md).

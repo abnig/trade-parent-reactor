@@ -12,4 +12,5 @@ public class JdbcUserPortfolioRepositoryFactory implements UserPortfolioReposito
     public MutualFundRepository funds(long userId) { return new OwnedFundRepository(jdbc, userId); }
     public MutualFundTxnRepository transactions(long userId) { return new OwnedTxnRepository(jdbc, userId); }
     public MutualFundValueRepository values(long userId) { return new OwnedValueRepository(jdbc, userId); }
+    public MutualFundOrderRepository orders(long userId) { return new OwnedOrderRepository(jdbc, userId); }
 }

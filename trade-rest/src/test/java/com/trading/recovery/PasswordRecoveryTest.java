@@ -49,7 +49,7 @@ class PasswordRecoveryTest {
 
     @BeforeEach void seed() throws Exception {
         resetSchema();
-        for (String file : new String[]{"V3__application_schema.sql", "V5__create_app_user.sql", "V6__portfolio_ownership.sql", "V7__password_recovery.sql"}) {
+        for (String file : new String[]{"V3__application_schema.sql", "V5__create_app_user.sql", "V6__portfolio_ownership.sql", "V7__password_recovery.sql", "V9__mutual_fund_orders.sql"}) {
             String sql = new ClassPathResource("db/migration/" + file).getContentAsString(StandardCharsets.UTF_8)
                     ;
             sql = adaptMigration(sql);

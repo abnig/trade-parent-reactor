@@ -6,4 +6,5 @@ public interface UserPortfolioRepositoryFactory {
     MutualFundRepository funds(long userId);
     MutualFundTxnRepository transactions(long userId);
     MutualFundValueRepository values(long userId);
+    MutualFundOrderRepository orders(long userId);
 }

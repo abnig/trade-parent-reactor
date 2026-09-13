@@ -16,6 +16,9 @@ public class MutualFund {
 
     @NotBlank(message = "Mutual fund name is required")
     private String mutualFundName;
+    @jakarta.validation.constraints.Size(min = 12, max = 12, message = "ISIN must contain 12 characters")
+    private String isin;
+    private String plan;
     private LocalDateTime createDate;
     private LocalDateTime updateDate;
 
@@ -32,6 +35,11 @@ public class MutualFund {
         this.createDate = createDate;
         this.updateDate = updateDate;
     }
+
+    public String getIsin() { return isin; }
+    public void setIsin(String isin) { this.isin = isin; }
+    public String getPlan() { return plan; }
+    public void setPlan(String plan) { this.plan = plan; }
 
     public Long getMutualFundId() {
         return mutualFundId;
