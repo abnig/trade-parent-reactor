@@ -6,6 +6,7 @@ import { formatDisplayDate, dateRangeError, isWithinDateRange } from './utils/da
 import { spacedDateTicks } from './components/chartTicks'
 import './components/AnalyticsDetails.test'
 import './components/PortfolioAnalytics.test'
+import './components/AdvancedReturns.test'
 
 test('analytics date labels stay spaced with clustered dates and a nearby final date', () => {
   const points = [0, 10, 30, 220, 230, 450, 650, 660, 870, 878].map(x => ({ x }))

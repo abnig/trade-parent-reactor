@@ -29,21 +29,25 @@ export function CashFlowChart({ rows }) {
   const width = Math.max(680, LEFT + RIGHT + rows.length * 110)
   const groupWidth = (width - LEFT - RIGHT) / rows.length
   const { y, ticks } = scale(rows.flatMap(row => [row.bought, -row.sold, row.net]))
+  const hasSales = rows.some(row => row.sold > 0)
   const series = [{ key: 'bought', label: 'BUY', color: '#2563eb', sign: 1 },
     { key: 'sold', label: 'SELL', color: '#c2410c', sign: -1 },
     { key: 'net', label: 'Net flow', color: '#172033', sign: 1 }]
+    .filter(item => item.key !== 'sold' || hasSales)
   return <>
-    <p className="chart-explanation">BUY adds investment; SELL is shown below zero as an outflow. Net flow = BUY − SELL.</p>
-    <div className="chart-legend">{series.map(item => <span key={item.key}><i style={{ background: item.color }} />{item.label}</span>)}</div>
+    <p className="chart-explanation">{hasSales
+      ? 'BUY adds investment; SELL is shown below zero as an outflow. Net flow = BUY − SELL.'
+      : 'No SELL cash flow in the selected range. BUY and net flow are equal.'}</p>
+    <div className="chart-legend">{series.map(item => <span key={item.key}><i className="chart-bar-swatch" style={{ background: item.color }} aria-hidden="true" />{item.label}</span>)}</div>
     <div className="analytics-chart-wrap" role="region" aria-label="Scrollable cash-flow chart" tabIndex={0}>
-      <svg className="analytics-detail-chart" style={{ minWidth: width }} viewBox={`0 0 ${width} ${HEIGHT}`} role="img" aria-label="BUY, SELL, and net cash flows by period; exact amounts are in the table below">
+      <svg className="analytics-detail-chart" style={{ minWidth: width }} viewBox={`0 0 ${width} ${HEIGHT}`} role="img" aria-label={`${series.map(item => item.label).join(', ')} by period; exact amounts are in the table below`}>
         <Grid width={width} y={y} ticks={ticks} />
         {rows.map((row, index) => {
           const center = LEFT + groupWidth * (index + 0.5)
           return <g key={row.date.getTime()}>
             {series.map((item, offset) => {
               const value = row[item.key] * item.sign
-              return <rect key={item.key} x={center + (offset - 1.5) * 22} y={Math.min(y(value), y(0))}
+              return <rect key={item.key} x={center + (offset - (series.length - 1) / 2) * 22 - 9} y={Math.min(y(value), y(0))}
                 width={18} height={Math.abs(y(value) - y(0))} fill={item.color}>
                 <title>{`${row.label}: ${item.label} ${formatMetric(value)}`}</title>
               </rect>

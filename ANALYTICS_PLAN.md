@@ -62,11 +62,19 @@ Consider these after the core views are stable:
 - Time-weighted return
 - Peak value and drawdown
 - Monthly return and volatility
-- Benchmark comparison using an explicitly selected benchmark data source
 
 These metrics need documented assumptions around valuation dates, cash-flow
-timing, missing snapshots, and external market data. They should not be
+timing, and missing snapshots. They should not be
 presented as precise until those assumptions are supported by the data model.
+
+### Phase 5: benchmark comparison
+
+Add benchmark comparison after the Phase 4 return calculations are stable,
+using an explicitly selected benchmark data source.
+
+Document assumptions around external market data, aligned comparison dates,
+return calculation methods, and missing benchmark observations before
+presenting comparisons as precise.
 
 ## Implementation approach
 
@@ -83,6 +91,9 @@ presented as precise until those assumptions are supported by the data model.
    endpoints cannot provide efficiently.
 6. Keep persistence in repositories using explicit SQL and parameter binding.
    Controllers should expose HTTP concerns only.
+7. Build Phase 4 fund-level returns and risk from the loaded histories using
+   pure calculation helpers. Show the covered valuation dates and reasons for
+   unavailable metrics, and document calculation assumptions alongside the UI.
 
 ## API considerations
 
@@ -154,6 +165,8 @@ mvn -pl trade-rest -am test
 2. Phase 2 cash-flow, holdings, and transaction views
 3. Phase 3 portfolio comparison and aggregation API
 4. Phase 4 advanced return and risk metrics after data assumptions are agreed
+5. Phase 5 benchmark comparison after the benchmark data source and comparison
+   assumptions are agreed
 
 Each phase should be released only after its calculations are verified against
 hand-worked examples and its empty/loading/error states are covered.
@@ -256,3 +269,111 @@ The PostgreSQL portfolio tests run in every normal Maven build. Testcontainers
 provisions an isolated PostgreSQL 16 database named `analytics_test`; the suite
 resets its public schema before each test. Docker must be running. No database
 URL environment variable is required, and startup failures fail the build.
+
+## Phase 4 implementation and calculation conventions
+
+Phase 4 is implemented in the individual fund's **Returns & risk** view, using
+the existing history endpoints and date filters. Portfolio-wide advanced
+returns are outside this phase: the aggregate endpoint does not provide a
+synchronized portfolio valuation history. Benchmark comparison is Phase 5.
+
+### Valuation coverage and cash-flow timing
+
+- The covered period runs from the first to the last valid snapshot inside the
+  selected range. Both dates and the snapshot count are displayed. The highest
+  value ID wins when valid snapshots share a calendar date, matching Phase 1.
+- Returns are measured over that covered period, not automatically from the
+  first purchase. The opening snapshot represents the existing holding;
+  transactions on or before its date must not be counted again. Transactions
+  after the final snapshot are excluded, with a notice when such transactions
+  exist within the selected range.
+- Snapshots are assumed to be end-of-day values after that day's transactions.
+  BUY amounts are contributions and SELL amounts are withdrawals (using the
+  absolute SELL amount). Same-day flows are netted. Negative BUY amounts are
+  unsupported. No intraday ordering, missing valuations, distributions, fees,
+  taxes, or unrecorded transactions are inferred.
+- These are recorded-data estimates under the stated timing assumptions.
+  Unsupported metrics show **Unavailable** and an explanation; missing data
+  must never appear as a zero return. Existing loading/error/range validation
+  gates also apply to the new view.
+
+### Money-weighted return / XIRR
+
+- Cash flows comprise the negative opening snapshot, negative subsequent BUY
+  amounts, positive SELL proceeds, and positive closing snapshot. The opening
+  value must be positive and the closing value nonnegative. Same-date amounts,
+  including the terminal value, are combined before solving.
+- Solve `sum(cashFlow / (1 + rate)^(calendarDays / 365)) = 0`. The displayed
+  percentage is annualized, including periods shorter than a year. Calendar-day
+  differences are independent of daylight saving changes; leap days count.
+- Require both payments and receipts on distinct dates. Only sequences with
+  one sign change from negative to positive are solved; later reinvestment
+  after a net receipt may introduce multiple roots and therefore returns
+  Unavailable rather than selecting a root using an arbitrary guess.
+- Use bounded bisection in `log(1 + rate)` and scaled terms to avoid overflow.
+  The supported decimal-rate range is `-0.9999999999` to `1000000`; a root
+  outside that range is unavailable. A total loss without any receipt has no
+  supported XIRR, though its time-weighted return can be -100%.
+
+### Time-weighted return, peak value, and drawdown
+
+- Require at least two snapshots and a snapshot on every date with nonzero net
+  cash flow strictly after the opening date through the closing date. No
+  cash-flow timing approximation or snapshot interpolation is used.
+- For adjacent snapshots, the growth factor is
+  `(closingValue - netCashFlowOnClosingDate) / openingValue`. Multiply factors
+  and subtract one for the cumulative, nonannualized time-weighted return.
+  Positive opening values and nonnegative snapshots and adjusted closing
+  values are required. A full exit can complete an interval, but its zero
+  balance cannot serve as the opening value of a subsequent interval.
+- Peak recorded value is the largest nonnegative snapshot in the covered
+  period, with its date (the earliest date wins a tie). It includes cash flows
+  and is separate from the performance index. Negative snapshot history makes
+  peak value unavailable.
+- The performance index begins at 100 and follows the time-weighted growth
+  factors. Drawdown is `index / runningPeakIndex - 1`, displayed as a negative
+  percentage or zero. Show both the largest observed decline and the final
+  snapshot's drawdown. Deposits and withdrawals alone do not create drawdown.
+- Drawdown is sampled only at recorded snapshots and can miss intermediate
+  peaks and troughs. If the complete return chain is unsupported, its index
+  and drawdown are unavailable rather than displaying a partial chain as full
+  coverage. Recorded values remain visible in an accessible, scrollable table.
+
+### Monthly returns and volatility
+
+- Each full calendar month requires snapshots at the previous calendar month
+  end, current calendar month end, and intervening nonzero cash-flow dates.
+  Month-end means the exact calendar date, without substituting a nearby
+  business day. Both boundaries must lie inside the covered period.
+- Monthly returns use the same time-weighted calculation. The monthly table
+  labels partial months and missing snapshots explicitly; unsupported months
+  are unavailable, not zero. An independently supported later month can still
+  show a return when an earlier month is unavailable.
+- Monthly volatility is the sample standard deviation (`n - 1` denominator)
+  of complete monthly percentage returns. At least two consecutive complete
+  months are required. Partial boundary months are excluded; a missing return
+  in any complete month makes volatility unavailable instead of silently
+  dropping the gap. Annualized volatility is monthly volatility times `sqrt(12)`.
+  The sample size is shown, and the UI explains the limitations of small samples.
+
+### Verification examples and references
+
+- Opening 100 and closing 110 exactly 365 days later, with no flows: XIRR 10%
+  and time-weighted return 10%.
+- Opening 100, then snapshot 160 after a BUY of 50, then snapshot 136 after a
+  SELL of 40: factors 1.10 and 1.10, cumulative return 21%, and no drawdown.
+- Values 100, 120, 90, 108 with no flows: maximum drawdown -25%, current
+  drawdown -10%, and cumulative return 8%.
+- Consecutive complete monthly returns +10% and -10%: monthly sample
+  volatility `sqrt(200)` = 14.14%, annualized `sqrt(2400)` = 48.99%.
+- Tests additionally cover empty/single-snapshot histories, filtering, opening
+  and later flows, same-day ordering, leap years, daylight saving boundaries,
+  full exits, negative data, ambiguous XIRR, missing flow-date snapshots,
+  partial months, missing month-end data, formatting, and view state gating.
+
+Method references: [Microsoft XIRR documentation](https://support.microsoft.com/en-us/excel/functions/xirr-function)
+for the dated cash-flow equation and 365-day basis, and the
+[GIPS Standards Handbook for Firms](https://www.gipsstandards.org/standards/gips-standards-for-firms/gips-standards-handbook-for-firms/)
+for valuation and cash-flow timing principles in time-weighted calculations.
+The stricter missing-data and unique-root rules above are application choices;
+this implementation does not claim GIPS compliance.

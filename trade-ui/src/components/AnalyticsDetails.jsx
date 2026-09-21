@@ -4,8 +4,9 @@ import { formatMetric } from './analyticsMetrics'
 import { formatDisplayDate, parseCalendarDate } from '../utils/date'
 import { CashFlowChart, HoldingsChart } from './ActivityCharts'
 import Pagination from './Pagination'
+import AdvancedReturns from './AdvancedReturns'
 
-export const ANALYTICS_VIEWS = [['value', 'Value history'], ['cash', 'Cash flows'], ['holdings', 'Holdings'], ['transactions', 'Transactions']]
+export const ANALYTICS_VIEWS = [['value', 'Value history'], ['cash', 'Cash flows'], ['holdings', 'Holdings'], ['transactions', 'Transactions'], ['returns', 'Returns & risk']]
 
 export function AnalyticsResults({ fundId, loading, error, rangeError, children }) {
   if (!fundId) return <div className="analytics-empty"><h3>Select a mutual fund</h3>
@@ -104,6 +105,7 @@ export function TransactionActivityView({ transactions, fundId, fromDate, toDate
 }
 
 export default function AnalyticsDetails({ view, ...props }) {
+  if (view === 'returns') return <AdvancedReturns {...props} />
   if (view === 'cash') return <CashFlowView {...props} />
   if (view === 'holdings') return <HoldingsView {...props} />
   return <TransactionActivityView key={`${props.fundId}:${props.fromDate}:${props.toDate}`} {...props} />
