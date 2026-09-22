@@ -24,12 +24,16 @@ test('fund submissions include metadata and explicit clearing without converting
   assert.equal(blank.folioNumber, '')
 })
 
-test('fund form accepts N/A and ISIN text without length limits', () => {
-  for (const isin of ['N/A', 'longer-than-twelve-characters']) {
-    const input = { ...form, isin }
+test('fund form accepts N/A source metadata and ISIN text without length limits', () => {
+  for (const input of [
+    { ...form, isin: 'N/A', plan: 'N/A', folioNumber: 'N/A' },
+    { ...form, isin: 'longer-than-twelve-characters' }
+  ]) {
     const html = renderToStaticMarkup(<MutualFundForm form={input} brokers={[]} setForm={() => {}} />)
-    assert.ok(html.includes(`ISIN<input value="${isin}"`))
+    assert.ok(html.includes(`ISIN<input value="${input.isin}"`))
     assert.doesNotMatch(html, /minLength|maxLength|pattern=/)
-    assert.equal(fundPayload(input).isin, isin)
+    assert.equal(fundPayload(input).isin, input.isin)
+    assert.equal(fundPayload(input).plan, input.plan)
+    assert.equal(fundPayload(input).folioNumber, input.folioNumber)
   }
 })

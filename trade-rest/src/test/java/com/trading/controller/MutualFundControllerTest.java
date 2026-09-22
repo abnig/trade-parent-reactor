@@ -67,7 +67,7 @@ class MutualFundControllerTest {
     }
 
     @Test
-    void acceptsIsinWithoutLengthRestrictionsAndExplicitClearing() throws Exception {
+    void acceptsNASourceMetadataWithoutRestrictionsAndExplicitClearing() throws Exception {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(repository.update(any())).thenAnswer(invocation -> invocation.getArgument(0));
         for (String isin : java.util.List.of("N/A", "short", "longer-than-twelve-characters", "")) {
@@ -76,6 +76,14 @@ class MutualFundControllerTest {
                                 .content("{\"brokerAccountId\":5,\"mutualFundName\":\"Fund\",\"isin\":\"" + isin + "\"}"))
                         .andExpect(status().is2xxSuccessful())
                         .andExpect(jsonPath("$.isin", is(isin)));
+            }
+        }
+        for (String field : java.util.List.of("plan", "folioNumber")) {
+            for (var request : java.util.List.of(post("/api/mutual-funds"), put("/api/mutual-funds/10"))) {
+                mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"brokerAccountId\":5,\"mutualFundName\":\"Fund\",\"" + field + "\":\"N/A\"}"))
+                        .andExpect(status().is2xxSuccessful())
+                        .andExpect(jsonPath("$." + field, is("N/A")));
             }
         }
     }

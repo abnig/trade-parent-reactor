@@ -1,7 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { TransactionMetadataFields, TransactionMetadataDetails } from './MutualFundTransactions'
+import MutualFundTransactions, { TransactionMetadataFields, TransactionMetadataDetails } from './MutualFundTransactions'
+
+test('transaction page offers separate single-entry and Zerodha file-upload actions', () => {
+  const html = renderToStaticMarkup(<MutualFundTransactions />)
+  assert.match(html, />Add Single Transaction<\/button>/)
+  assert.match(html, />Upload Zerodha Transactions File<\/button>/)
+  assert.match(html, /type="file"[^>]*accept="\.csv,text\/csv"/)
+  assert.doesNotMatch(html, /\+ Add Transaction/)
+})
 
 test('status dropdown offers Processed and Completed and preserves existing statuses on edit', () => {
   for (const status of ['', 'Processed', 'Completed', 'PROCESSING', 'COMPLETE']) {

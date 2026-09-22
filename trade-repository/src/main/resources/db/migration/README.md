@@ -76,4 +76,6 @@ HAVING COUNT(*) > 1;
 `V13__relax_mutual_fund_isin_length.sql` removes the exact-length ISIN check and
 widens `mutual_fund.isin` to nullable TEXT. Apply after V12 before deploying the
 updated form/API, which accept `N/A` and other source text without length limits.
+`plan` and `folio_number` are also nullable TEXT columns without validation
+constraints, so `N/A` is a valid stored source value for all three fields.
 Existing values and the optional-field update/clearing behavior are preserved.

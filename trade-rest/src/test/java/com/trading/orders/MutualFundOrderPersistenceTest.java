@@ -28,20 +28,27 @@ class MutualFundOrderPersistenceTest {
     protected JdbcTemplate jdbc;
     protected UserPortfolioRepositoryFactory portfolios;
 
-    @Test void fundIsinAcceptsSourceTextWithoutLengthRestrictions() {
-        verifyFundIsin(portfolios.funds(1));
+    @Test void fundSourceMetadataAcceptsNA() {
+        verifyFundSourceMetadata(portfolios.funds(1));
     }
 
-    protected void verifyFundIsin(com.trading.repository.MutualFundRepository repository) {
+    protected void verifyFundSourceMetadata(com.trading.repository.MutualFundRepository repository) {
         var fund = new MutualFund(null, 1L, "Source fund", null, null);
         fund.setIsin("N/A");
+        fund.setPlan("N/A");
+        fund.setFolioNumber("N/A");
         var saved = repository.save(fund);
         assertEquals("N/A", saved.getIsin());
+        assertEquals("N/A", saved.getPlan());
+        assertEquals("N/A", saved.getFolioNumber());
         saved.setIsin("longer-than-twelve-characters");
         assertEquals(saved.getIsin(), repository.update(saved).getIsin());
         saved.setIsin("N/A");
         repository.update(saved);
-        assertEquals("N/A", repository.findById(saved.getMutualFundId()).getIsin());
+        var reloaded = repository.findById(saved.getMutualFundId());
+        assertEquals("N/A", reloaded.getIsin());
+        assertEquals("N/A", reloaded.getPlan());
+        assertEquals("N/A", reloaded.getFolioNumber());
     }
 
     @Test void transactionMetadataRoundTripsWithoutChangingFinancialTotals() {

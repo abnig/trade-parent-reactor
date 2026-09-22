@@ -10,6 +10,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -33,7 +34,7 @@ public class GlobalExceptionHandler {
             fieldErrors.putIfAbsent(error.getField(), error.getDefaultMessage());
         }
         return error(HttpStatus.BAD_REQUEST, "Validation failed", "Request validation failed.",
-                request, fieldErrors);
+                request, fieldErrors, exception);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -43,67 +44,83 @@ public class GlobalExceptionHandler {
         exception.getConstraintViolations().forEach(violation ->
                 fieldErrors.put(violation.getPropertyPath().toString(), violation.getMessage()));
         return error(HttpStatus.BAD_REQUEST, "Validation failed", "Request validation failed.",
-                request, fieldErrors);
+                request, fieldErrors, exception);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleUnreadableRequest(
             HttpMessageNotReadableException exception, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, "Invalid request", "Request body is invalid.",
-                request, Map.of());
+                request, Map.of(), exception);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiError> handleStatus(
+            ResponseStatusException exception, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.valueOf(exception.getStatusCode().value());
+        String message = exception.getReason() == null ? status.getReasonPhrase() : exception.getReason();
+        return error(status, status.getReasonPhrase(), message, request, Map.of(), exception);
     }
 
     @ExceptionHandler(InvalidReferenceException.class)
     public ResponseEntity<ApiError> handleInvalidReference(
             InvalidReferenceException exception, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, "Invalid reference", exception.getMessage(),
-                request, Map.of());
+                request, Map.of(), exception);
     }
 
     @ExceptionHandler(InvalidPaginationException.class)
     public ResponseEntity<ApiError> handleInvalidPagination(
             InvalidPaginationException exception, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, "Invalid pagination", exception.getMessage(),
-                request, Map.of());
+                request, Map.of(), exception);
     }
 
     @ExceptionHandler(EmptyResultDataAccessException.class)
     public ResponseEntity<ApiError> handleMissingResource(
             EmptyResultDataAccessException exception, HttpServletRequest request) {
         return error(HttpStatus.NOT_FOUND, "Not found", "Requested resource was not found.",
-                request, Map.of());
+                request, Map.of(), exception);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataConstraint(
             DataIntegrityViolationException exception, HttpServletRequest request) {
         return error(HttpStatus.BAD_REQUEST, "Invalid request", "Request violates a data constraint.",
-                request, Map.of());
+                request, Map.of(), exception);
     }
 
     @ExceptionHandler(com.trading.recovery.RecoveryException.class)
     public ResponseEntity<ApiError> handleRecovery(com.trading.recovery.RecoveryException exception, HttpServletRequest request) {
-        return error(exception.status(), exception.status().getReasonPhrase(), exception.getMessage(), request, Map.of());
+        return error(exception.status(), exception.status().getReasonPhrase(), exception.getMessage(),
+                request, Map.of(), exception);
     }
 
     @ExceptionHandler({org.springframework.web.servlet.resource.NoResourceFoundException.class,
             org.springframework.web.servlet.NoHandlerFoundException.class})
     public ResponseEntity<ApiError> handleUnknownRoute(Exception exception, HttpServletRequest request) {
-        return error(HttpStatus.NOT_FOUND, "Not found", "Requested resource was not found.", request, Map.of());
+        return error(HttpStatus.NOT_FOUND, "Not found", "Requested resource was not found.",
+                request, Map.of(), exception);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(
             Exception exception, HttpServletRequest request) {
-        logger.error("Unexpected REST API error for {} {}", request.getMethod(), request.getRequestURI(),
-                exception);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error",
-                "An unexpected error occurred.", request, Map.of());
+                "An unexpected error occurred.", request, Map.of(), exception);
     }
 
     private ResponseEntity<ApiError> error(HttpStatus status, String error, String message,
                                            HttpServletRequest request,
-                                           Map<String, String> fieldErrors) {
+                                           Map<String, String> fieldErrors,
+                                           Exception exception) {
+        if (status.is5xxServerError()) {
+            logger.error("REST API error [{}] for {} {}: {}", status.value(), request.getMethod(),
+                    request.getRequestURI(), message, exception);
+        } else {
+            logger.warn("REST API validation/client error [{}] for {} {}: {}", status.value(), request.getMethod(),
+                    request.getRequestURI(), message);
+        }
         return ResponseEntity.status(status)
                 .body(new ApiError(status.value(), error, message, request.getRequestURI(), fieldErrors));
     }

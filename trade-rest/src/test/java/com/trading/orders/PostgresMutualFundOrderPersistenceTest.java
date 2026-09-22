@@ -13,8 +13,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Always runs against container-managed PostgreSQL, using a fresh schema per test. */
 class PostgresMutualFundOrderPersistenceTest extends MutualFundOrderPersistenceTest {
-    @Test void unscopedFundRepositoryAcceptsIsinWithoutLengthRestrictions() {
-        verifyFundIsin(new MutualFundRepositoryImpl(jdbc));
+    @Test void unscopedFundRepositoryAcceptsNASourceMetadata() {
+        verifyFundSourceMetadata(new MutualFundRepositoryImpl(jdbc));
     }
     @Test void unscopedTransactionRepositoryPreservesMetadata() {
         verifyTransactionMetadata(new com.trading.repository.impl.MutualFundTxnRepositoryImpl(jdbc));
