@@ -4,7 +4,7 @@ import api from '../api/api'
 import Pagination from './Pagination'
 import { formatDisplayDate } from '../utils/date'
 
-const empty = { mutualFundId: '', transactionType: 'BUY', amount: '', units: '', avgPrice: '', txnDate: '' }
+const empty = { mutualFundId: '', transactionType: 'BUY', amount: '', units: '', avgPrice: '', txnDate: '', status: '', exchangeOrderId: '', remarks: '', tag: '', settlementId: '' }
 const initialPage = { page: 0, size: 20, totalPages: 0, totalElements: 0, first: true, last: true }
 
 export default function MutualFundTransactions() {
@@ -92,7 +92,8 @@ export default function MutualFundTransactions() {
       const data = {
         mutualFundId: Number(form.mutualFundId), transactionType: form.transactionType,
         amount: Number(form.amount), units: Number(form.units), avgPrice: Number(form.avgPrice),
-        txnDate: form.txnDate
+        txnDate: form.txnDate,
+        status: form.status, exchangeOrderId: form.exchangeOrderId, remarks: form.remarks, tag: form.tag, settlementId: form.settlementId
       }
       if (editingId) await api.transactions.update(editingId, { ...data, mutualFundTxnId: editingId })
       else await api.transactions.create(data)
@@ -131,6 +132,7 @@ export default function MutualFundTransactions() {
       <label>Units<input required type="number" min="0" step="0.001" value={form.units} onChange={e => setForm({ ...form, units: e.target.value })} /></label>
       <label>Average Price<input required type="number" min="0" step="0.001" value={form.avgPrice} onChange={e => setForm({ ...form, avgPrice: e.target.value })} /></label>
       <label>Transaction Date<DateInput required value={form.txnDate} onChange={value => setForm({ ...form, txnDate: value })} /></label>
+      <TransactionMetadataFields form={form} setForm={setForm} />
     </div><div className="form-actions"><button type="button" className="secondary" onClick={reset}>Cancel</button><button className="primary" type="submit">{editingId ? 'Update' : 'Create'}</button></div></form>}
     <div className="filter-card"><label>Filter by Mutual Fund<select value={selectedFundId} onChange={e => selectFund(e.target.value)}><option value="">All Mutual Funds</option>{funds.map(f => <option key={f.mutualFundId} value={f.mutualFundId}>{f.mutualFundName}</option>)}</select></label>{selectedFundId && <button className="secondary clear-filter" type="button" onClick={() => selectFund('')}>Clear Filter</button>}</div>
     {selectedFundId && <section className="transaction-summary" aria-label="Transaction summary">
@@ -140,8 +142,8 @@ export default function MutualFundTransactions() {
       </>}
     </section>}
     {!selectedFundId ? <FundInvestmentOverview funds={funds} loading={fundsLoading} error={fundsError} /> : <>
-    <div className="table-wrap"><table><thead><tr><th>Mutual Fund</th><th>Type</th><th>Amount</th><th>Units</th><th>Avg Price</th><th>Transaction Date</th><th>Actions</th></tr></thead><tbody>
-      {loading ? <tr><td colSpan="7" className="empty">Loading...</td></tr> : items.length === 0 ? <tr><td colSpan="7" className="empty">No transactions found.</td></tr> : items.map(t => <tr key={t.mutualFundTxnId}><td>{fundName(t.mutualFundId)}</td><td>{t.transactionType}</td><td>{formatNumber(t.amount)}</td><td>{formatNumber(t.units)}</td><td>{formatNumber(t.avgPrice)}</td><td>{formatDate(t.txnDate)}</td><td><div className="actions"><button onClick={() => { setForm({ mutualFundId: String(t.mutualFundId), transactionType: t.transactionType || 'BUY', amount: String(t.amount ?? ''), units: String(t.units ?? ''), avgPrice: String(t.avgPrice ?? ''), txnDate: toInputDate(t.txnDate) }); setEditingId(t.mutualFundTxnId); setShowForm(true) }}>Edit</button><button className="danger-text" onClick={() => remove(t.mutualFundTxnId)}>Delete</button></div></td></tr>)}
+    <div className="table-wrap"><table><thead><tr><th>Mutual Fund</th><th>Type</th><th>Amount</th><th>Units</th><th>Avg Price</th><th>Transaction Date</th><th>Order Metadata</th><th>Actions</th></tr></thead><tbody>
+      {loading ? <tr><td colSpan="8" className="empty">Loading...</td></tr> : items.length === 0 ? <tr><td colSpan="8" className="empty">No transactions found.</td></tr> : items.map(t => <tr key={t.mutualFundTxnId}><td>{fundName(t.mutualFundId)}</td><td>{t.transactionType}</td><td>{formatNumber(t.amount)}</td><td>{formatNumber(t.units)}</td><td>{formatNumber(t.avgPrice)}</td><td>{formatDate(t.txnDate)}</td><td><TransactionMetadataDetails transaction={t} /></td><td><div className="actions"><button onClick={() => { setForm({ mutualFundId: String(t.mutualFundId), transactionType: t.transactionType || 'BUY', amount: String(t.amount ?? ''), units: String(t.units ?? ''), avgPrice: String(t.avgPrice ?? ''), txnDate: toInputDate(t.txnDate), status: t.status ?? '', exchangeOrderId: t.exchangeOrderId ?? '', remarks: t.remarks ?? '', tag: t.tag ?? '', settlementId: t.settlementId ?? '' }); setEditingId(t.mutualFundTxnId); setShowForm(true) }}>Edit</button><button className="danger-text" onClick={() => remove(t.mutualFundTxnId)}>Delete</button></div></td></tr>)}
     </tbody></table></div>
     {!loading && <Pagination {...paging} loading={loading} onPrevious={() => setPaging(c => ({ ...c, page: c.page - 1 }))} onNext={() => setPaging(c => ({ ...c, page: c.page + 1 }))} onSizeChange={(size) => setPaging(c => ({ ...c, page: 0, size }))} />}
     </>}
@@ -172,4 +174,34 @@ export function FundInvestmentOverview({ funds, loading, error }) {
       </tr></tfoot>}
     </table></div>
   </section>
+}
+
+const metadataFields = [
+  ['status', 'Status'], ['exchangeOrderId', 'Exchange Order ID'],
+  ['settlementId', 'Settlement ID'], ['remarks', 'Remarks'], ['tag', 'Tag']
+]
+
+export function TransactionMetadataFields({ form, setForm }) {
+  return <>{metadataFields.map(([key, label]) => <label key={key}>{label}
+    {key === 'status'
+      ? <select value={form.status} onChange={event => setForm({ ...form, status: event.target.value })}>
+        <option value="">Select status</option>
+        {form.status && !['Processed', 'Completed'].includes(form.status) &&
+          <option value={form.status} disabled>Current: {form.status}</option>}
+        <option value="Processed">Processed</option>
+        <option value="Completed">Completed</option>
+      </select>
+      : key === 'remarks' || key === 'tag'
+      ? <textarea value={form[key]} onChange={event => setForm({ ...form, [key]: event.target.value })} />
+      : <input value={form[key]} onChange={event => setForm({ ...form, [key]: event.target.value })} />}
+  </label>)}</>
+}
+
+export function TransactionMetadataDetails({ transaction }) {
+  const present = metadataFields.filter(([key]) => transaction[key] != null && transaction[key] !== '')
+  if (!present.length) return '—'
+  return <details><summary>{transaction.status || 'View metadata'}</summary>
+    <dl>{present.map(([key, label]) => <div key={key}><dt>{label}</dt>
+      <dd style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{transaction[key]}</dd></div>)}</dl>
+  </details>
 }

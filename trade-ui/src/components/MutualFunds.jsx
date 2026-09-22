@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import api from '../api/api'
 import Pagination from './Pagination'
 
-const empty = { brokerAccountId: '', mutualFundName: '' }
+const empty = { brokerAccountId: '', mutualFundName: '', isin: '', plan: '', folioNumber: '' }
 const initialPage = { page: 0, size: 20, totalPages: 0, totalElements: 0, first: true, last: true }
 
 export default function MutualFunds() {
@@ -53,7 +53,7 @@ export default function MutualFunds() {
   const submit = async (event) => {
     event.preventDefault()
     try {
-      const data = { brokerAccountId: Number(form.brokerAccountId), mutualFundName: form.mutualFundName.trim() }
+      const data = fundPayload(form)
       if (editingId) await api.mutualFunds.update(editingId, { ...data, mutualFundId: editingId })
       else await api.mutualFunds.create(data)
       reset()
@@ -80,14 +80,25 @@ export default function MutualFunds() {
   return <section>
     <div className="section-header"><div><h2>Mutual Funds</h2><p>Manage funds linked to broker accounts.</p></div><button className="primary" onClick={() => { reset(); setShowForm(true) }}>+ Add Mutual Fund</button></div>
     {error && <div className="error">{error}</div>}
-    {showForm && <form className="form-card" onSubmit={submit}><div className="form-grid">
-      <label>Broker Account<select required value={form.brokerAccountId} onChange={e => setForm({ ...form, brokerAccountId: e.target.value })}><option value="">Select account</option>{brokers.map(b => <option key={b.id} value={b.id}>{b.brokerName} — {b.accountId}</option>)}</select></label>
-      <label>Mutual Fund Name<input required value={form.mutualFundName} onChange={e => setForm({ ...form, mutualFundName: e.target.value })} /></label>
-    </div><div className="form-actions"><button type="button" className="secondary" onClick={reset}>Cancel</button><button className="primary" type="submit">{editingId ? 'Update' : 'Create'}</button></div></form>}
+    {showForm && <MutualFundForm form={form} setForm={setForm} brokers={brokers} editingId={editingId} submit={submit} reset={reset} />}
     <div className="filter-card"><label>Broker Account<select value={selectedBrokerId} onChange={e => selectBroker(e.target.value)}><option value="">All Broker Accounts</option>{brokers.map(b => <option key={b.id} value={b.id}>{b.brokerName} — {b.accountId}</option>)}</select></label>{selectedBrokerId && <button type="button" className="secondary clear-filter" onClick={() => selectBroker('')}>Clear Filter</button>}</div>
-    <div className="table-wrap"><table><thead><tr><th>Broker</th><th>Mutual Fund</th><th>Actions</th></tr></thead><tbody>
-      {loading ? <tr><td colSpan="3" className="empty">Loading...</td></tr> : items.length === 0 ? <tr><td colSpan="3" className="empty">No mutual funds found.</td></tr> : items.map((fund) => <tr key={fund.mutualFundId}><td>{brokerName(fund.brokerAccountId)}</td><td>{fund.mutualFundName}</td><td><div className="actions"><button onClick={() => { setForm({ brokerAccountId: String(fund.brokerAccountId), mutualFundName: fund.mutualFundName || '' }); setEditingId(fund.mutualFundId); setShowForm(true) }}>Edit</button><button className="danger-text" onClick={() => remove(fund.mutualFundId)}>Delete</button></div></td></tr>)}
+    <div className="table-wrap"><table><thead><tr><th>Broker</th><th>Mutual Fund</th><th>ISIN</th><th>Plan</th><th>Folio Number</th><th>Actions</th></tr></thead><tbody>
+      {loading ? <tr><td colSpan="6" className="empty">Loading...</td></tr> : items.length === 0 ? <tr><td colSpan="6" className="empty">No mutual funds found.</td></tr> : items.map((fund) => <tr key={fund.mutualFundId}><td>{brokerName(fund.brokerAccountId)}</td><td>{fund.mutualFundName}</td><td>{fund.isin || '—'}</td><td>{fund.plan || '—'}</td><td>{fund.folioNumber || '—'}</td><td><div className="actions"><button onClick={() => { setForm({ brokerAccountId: String(fund.brokerAccountId), mutualFundName: fund.mutualFundName || '', isin: fund.isin || '', plan: fund.plan || '', folioNumber: fund.folioNumber || '' }); setEditingId(fund.mutualFundId); setShowForm(true) }}>Edit</button><button className="danger-text" onClick={() => remove(fund.mutualFundId)}>Delete</button></div></td></tr>)}
     </tbody></table></div>
     {!loading && <Pagination {...paging} loading={loading} onPrevious={() => setPaging(c => ({ ...c, page: c.page - 1 }))} onNext={() => setPaging(c => ({ ...c, page: c.page + 1 }))} onSizeChange={(size) => setPaging(c => ({ ...c, page: 0, size }))} />}
   </section>
+}
+
+export function fundPayload(form) {
+  return { brokerAccountId: Number(form.brokerAccountId), mutualFundName: form.mutualFundName.trim(), isin: form.isin.trim(), plan: form.plan, folioNumber: form.folioNumber }
+}
+
+export function MutualFundForm({ form, setForm, brokers, editingId, submit, reset }) {
+  return <form className="form-card" onSubmit={submit}><div className="form-grid">
+      <label>Broker Account<select required value={form.brokerAccountId} onChange={e => setForm({ ...form, brokerAccountId: e.target.value })}><option value="">Select account</option>{brokers.map(b => <option key={b.id} value={b.id}>{b.brokerName} — {b.accountId}</option>)}</select></label>
+      <label>Mutual Fund Name<input required value={form.mutualFundName} onChange={e => setForm({ ...form, mutualFundName: e.target.value })} /></label>
+      <label>ISIN<input value={form.isin} onChange={e => setForm({ ...form, isin: e.target.value })} /></label>
+      <label>Plan<input value={form.plan} onChange={e => setForm({ ...form, plan: e.target.value })} /></label>
+      <label>Folio Number<input value={form.folioNumber} onChange={e => setForm({ ...form, folioNumber: e.target.value })} /></label>
+    </div><div className="form-actions"><button type="button" className="secondary" onClick={reset}>Cancel</button><button className="primary" type="submit">{editingId ? 'Update' : 'Create'}</button></div></form>
 }

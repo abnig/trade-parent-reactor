@@ -39,7 +39,7 @@ class SessionAndOwnershipTest {
     @BeforeEach
     void seed() throws Exception {
         jdbc.execute("DROP ALL OBJECTS");
-        for (String file : new String[]{"V3__application_schema.sql", "V5__create_app_user.sql", "V6__portfolio_ownership.sql", "V7__password_recovery.sql", "V9__mutual_fund_orders.sql"}) {
+        for (String file : new String[]{"V3__application_schema.sql", "V5__create_app_user.sql", "V6__portfolio_ownership.sql", "V7__password_recovery.sql", "V9__mutual_fund_orders.sql", "V10__move_folio_to_mutual_fund.sql", "V11__move_order_metadata_to_transactions.sql", "V12__unique_broker_account_per_owner.sql", "V13__relax_mutual_fund_isin_length.sql"}) {
             String sql = new ClassPathResource("db/migration/" + file).getContentAsString(StandardCharsets.UTF_8)
                     .replace(" ON CONFLICT (name) DO NOTHING", ""); // H2 lacks this PostgreSQL syntax.
             for (String statement : sql.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
@@ -68,6 +68,23 @@ class SessionAndOwnershipTest {
         mvc.perform(secured(post("/api/auth/login").param("username", username).param("password", PASSWORD), session))
                 .andExpect(status().isNoContent());
         return session;
+    }
+
+    @Test void duplicateBrokerAccountsAreRejectedForOneOwnerButAllowedAcrossOwners() throws Exception {
+        var alice = login("alice");
+        String duplicate = "{\"brokerName\":\"Broker 1\",\"accountId\":\"Account 1\"}";
+        mvc.perform(secured(post("/api/broker-accounts"), alice).contentType("application/json").content(duplicate))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Request violates a data constraint."));
+        mvc.perform(secured(post("/api/broker-accounts"), login("bob")).contentType("application/json").content(duplicate))
+                .andExpect(status().isCreated());
+        var created = mvc.perform(secured(post("/api/broker-accounts"), alice).contentType("application/json")
+                        .content("{\"brokerName\":\"Broker 1\",\"accountId\":\"Another account\"}"))
+                .andExpect(status().isCreated()).andReturn();
+        long id = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(secured(put("/api/broker-accounts/" + id), alice).contentType("application/json").content(duplicate))
+                .andExpect(status().isBadRequest());
+        assertEquals("Another account", jdbc.queryForObject("SELECT account_id FROM mutual_fund_broker_account WHERE broker_account_id=?", String.class, id));
     }
 
     @Test void fundInvestmentTotalsIncludeAllTransactionsAndOnlyOwnedFunds() throws Exception {

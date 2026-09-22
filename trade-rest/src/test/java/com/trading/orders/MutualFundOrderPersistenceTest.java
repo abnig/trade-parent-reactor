@@ -27,6 +27,70 @@ import static org.junit.jupiter.api.Assertions.*;
 class MutualFundOrderPersistenceTest {
     protected JdbcTemplate jdbc;
     protected UserPortfolioRepositoryFactory portfolios;
+
+    @Test void fundIsinAcceptsSourceTextWithoutLengthRestrictions() {
+        verifyFundIsin(portfolios.funds(1));
+    }
+
+    protected void verifyFundIsin(com.trading.repository.MutualFundRepository repository) {
+        var fund = new MutualFund(null, 1L, "Source fund", null, null);
+        fund.setIsin("N/A");
+        var saved = repository.save(fund);
+        assertEquals("N/A", saved.getIsin());
+        saved.setIsin("longer-than-twelve-characters");
+        assertEquals(saved.getIsin(), repository.update(saved).getIsin());
+        saved.setIsin("N/A");
+        repository.update(saved);
+        assertEquals("N/A", repository.findById(saved.getMutualFundId()).getIsin());
+    }
+
+    @Test void transactionMetadataRoundTripsWithoutChangingFinancialTotals() {
+        verifyTransactionMetadata(portfolios.transactions(1));
+        var foreign = portfolios.transactions(2).findById(3L);
+        foreign.setRemarks("Not allowed");
+        assertThrows(EmptyResultDataAccessException.class, () -> portfolios.transactions(1).update(foreign));
+        assertNull(portfolios.transactions(2).findById(3L).getRemarks());
+    }
+
+    protected void verifyTransactionMetadata(com.trading.repository.MutualFundTxnRepository repository) {
+        var txn = repository.findById(1L);
+        txn.setStatus("PROCESSING");
+        txn.setExchangeOrderId("000009876543210987654321");
+        txn.setSettlementId("000123");
+        txn.setRemarks("Optional processing information");
+        String tag = "  {\"tag\": [\"coinandroid\"]}  ";
+        txn.setTag(tag);
+        var saved = repository.save(txn);
+        var before = repository.getSummary();
+        for (var found : java.util.List.of(saved, repository.findById(saved.getMutualFundTxnId()),
+                repository.findAll(PAGE).stream().filter(t -> t.getMutualFundTxnId().equals(saved.getMutualFundTxnId())).findFirst().orElseThrow(),
+                repository.findByMutualFundId(1L, PAGE).stream().filter(t -> t.getMutualFundTxnId().equals(saved.getMutualFundTxnId())).findFirst().orElseThrow())) {
+            assertEquals("PROCESSING", found.getStatus());
+            assertEquals("000009876543210987654321", found.getExchangeOrderId());
+            assertEquals("000123", found.getSettlementId());
+            assertEquals("Optional processing information", found.getRemarks());
+            assertEquals(tag, found.getTag());
+        }
+        var legacy = new com.trading.model.MutualFundTxn(saved.getMutualFundTxnId(), 1L,
+                saved.getAmount(), saved.getUnits(), saved.getAvgPrice(), null, null, saved.getTxnDate(), "BUY");
+        var preserved = repository.update(legacy);
+        assertEquals(tag, preserved.getTag());
+        assertEquals("PROCESSING", preserved.getStatus());
+        assertEquals(saved.getExchangeOrderId(), preserved.getExchangeOrderId());
+        assertEquals(saved.getSettlementId(), preserved.getSettlementId());
+        assertEquals(saved.getRemarks(), preserved.getRemarks());
+        preserved.setStatus("COMPLETE");
+        preserved.setTag("coinandroidsip");
+        preserved.setRemarks("");
+        var updated = repository.update(preserved);
+        assertEquals("COMPLETE", updated.getStatus());
+        assertEquals("coinandroidsip", updated.getTag());
+        assertEquals("", updated.getRemarks());
+        assertEquals(before.getTotalValue(), repository.getSummary().getTotalValue());
+        assertEquals(before.getTotalUnits(), repository.getSummary().getTotalUnits());
+        // Exchange and settlement references may be shared by transactions.
+        assertEquals("000123", repository.save(updated).getSettlementId());
+    }
     private static final PageRequest PAGE = PageRequest.of(0, 20);
 
     protected DataSource dataSource() {
@@ -60,6 +124,10 @@ class MutualFundOrderPersistenceTest {
             jdbc.update("INSERT INTO mutual_fund_txn(mutual_fund_id,amount,units,avg_price,txn_date,txn_type) VALUES(?,123.45,1.234,100.041,'2025-01-02 16:30:00','BUY')", id);
         }
         migrate("V9__mutual_fund_orders.sql");
+        migrate("V10__move_folio_to_mutual_fund.sql");
+        migrate("V11__move_order_metadata_to_transactions.sql");
+        migrate("V12__unique_broker_account_per_owner.sql");
+        migrate("V13__relax_mutual_fund_isin_length.sql");
         portfolios = new JdbcUserPortfolioRepositoryFactory(jdbc);
     }
 
@@ -85,18 +153,24 @@ class MutualFundOrderPersistenceTest {
         fund.setMutualFundName("Scheme");
         fund.setIsin("INF123456789");
         fund.setPlan("source plan text");
+        fund.setFolioNumber("00001234/05");
         var saved = portfolios.funds(1).save(fund);
         assertEquals(fund.getIsin(), saved.getIsin());
         assertEquals(fund.getPlan(), saved.getPlan());
+        assertEquals("00001234/05", saved.getFolioNumber());
         var legacyUpdate = new MutualFund(saved.getMutualFundId(), 1L, "Renamed", null, null);
         var updated = portfolios.funds(1).update(legacyUpdate);
         assertEquals("INF123456789", updated.getIsin());
         assertEquals("source plan text", updated.getPlan());
+        assertEquals("00001234/05", updated.getFolioNumber());
+        updated.setIsin("");
+        updated.setPlan("");
+        updated.setFolioNumber("");
+        var cleared = portfolios.funds(1).update(updated);
+        assertNull(cleared.getIsin());
+        assertNull(cleared.getPlan());
+        assertNull(cleared.getFolioNumber());
         assertEquals("Renamed", updated.getMutualFundName());
-        fund.setIsin("too-short");
-        assertThrows(DataIntegrityViolationException.class, () -> portfolios.funds(1).save(fund));
-        fund.setIsin("INF1234567890");
-        assertThrows(DataIntegrityViolationException.class, () -> portfolios.funds(1).save(fund));
     }
 
     @Test void completedTransactionPersistenceRetainsSixDecimalsAndOriginalIntegerCapacity() {
@@ -110,29 +184,18 @@ class MutualFundOrderPersistenceTest {
         assertEquals(saved.getUnits(), portfolios.transactions(1).update(saved).getUnits());
     }
 
-    @Test void completedOrderPreservesDatesIdentifiersDecimalsAndRawJson() {
-        var order = order(1L, "COMPLETE");
+    @Test void linkedOrderPreservesDatesAndDecimals() {
+        var order = order(1L);
         order.setMutualFundTxnId(1L);
-        order.setSettlementId("000123");
-        order.setFolioNumber("00001234/05");
-        order.setExchangeOrderId("000009876543210987654321");
         order.setUnits(new BigDecimal("12.345678"));
         order.setAvgPrice(new BigDecimal("81.000123"));
-        order.setTag("{\"tag\": [\"coinandroid\"]}");
-        order.setRemarks("Processing information");
         var saved = portfolios.orders(1).save(order);
-        assertEquals(order.getSettlementId(), saved.getSettlementId());
-        assertEquals(order.getFolioNumber(), saved.getFolioNumber());
-        assertEquals(order.getExchangeOrderId(), saved.getExchangeOrderId());
         assertEquals(order.getTradeDate(), saved.getTradeDate());
         assertEquals(order.getOrderedAt(), saved.getOrderedAt());
         assertEquals(order.getAmount(), saved.getAmount());
         assertEquals(order.getUnits(), saved.getUnits());
         assertEquals(order.getAvgPrice(), saved.getAvgPrice());
-        assertEquals(order.getTag(), saved.getTag());
-        assertEquals(order.getRemarks(), saved.getRemarks());
         assertEquals("BUY", saved.getTransactionType());
-        assertEquals("COMPLETE", saved.getStatus());
         assertEquals(1L, saved.getMutualFundTxnId());
         assertNotNull(saved.getCreateDate());
         assertNotNull(saved.getUpdateDate());
@@ -142,24 +205,17 @@ class MutualFundOrderPersistenceTest {
 
     @Test void processingZerosAndMissingDetailsNeverCreateTransactionsOrHoldings() {
         var before = portfolios.transactions(1).getSummary();
-        var order = order(1L, "PROCESSING");
+        var order = order(1L);
         order.setUnits(BigDecimal.ZERO);
         order.setAvgPrice(BigDecimal.ZERO);
-        order.setTag("coinandroidsip");
         var saved = portfolios.orders(1).save(order);
-        assertNull(saved.getSettlementId());
-        assertNull(saved.getFolioNumber());
         assertNull(saved.getMutualFundTxnId());
         assertEquals(new BigDecimal("0.000000"), saved.getUnits());
         assertEquals(new BigDecimal("0.000000"), saved.getAvgPrice());
-        assertEquals("coinandroidsip", saved.getTag());
-        saved.setStatus("HISTORICAL_OTHER_STATUS");
         saved.setTransactionType("HISTORICAL_OTHER_DIRECTION");
         saved.setUnits(null);
         saved.setAvgPrice(null);
-        saved.setRemarks("Source explanation");
         var updated = portfolios.orders(1).update(saved);
-        assertEquals(saved.getStatus(), updated.getStatus());
         assertEquals(saved.getTransactionType(), updated.getTransactionType());
         assertNull(updated.getUnits());
         assertNull(updated.getAvgPrice());
@@ -172,11 +228,9 @@ class MutualFundOrderPersistenceTest {
         assertNull(portfolios.orders(1).save(incomplete).getTradeDate());
     }
 
-    @Test void repeatedReferencesAreAllowedWithinAndAcrossAccountsAndPaginationIsScoped() {
+    @Test void orderPaginationIsScopedWithinAndAcrossAccounts() {
         for (long fund : new long[]{1, 1, 2, 3}) {
-            var order = order(fund, "COMPLETE");
-            order.setSettlementId("shared-settlement");
-            order.setExchangeOrderId("shared-exchange-reference");
+            var order = order(fund);
             order.setTransactionType("SELL");
             portfolios.orders(fund == 3 ? 2 : 1).save(order);
         }
@@ -187,11 +241,11 @@ class MutualFundOrderPersistenceTest {
     }
 
     @Test void ownershipAndSameFundTransactionReferenceAreEnforcedOnWrites() {
-        var saved = portfolios.orders(1).save(order(1L, "PROCESSING"));
+        var saved = portfolios.orders(1).save(order(1L));
         assertThrows(EmptyResultDataAccessException.class, () -> portfolios.orders(2).findById(saved.getMutualFundOrderId()));
         assertThrows(EmptyResultDataAccessException.class, () -> portfolios.orders(2).update(saved));
-        assertThrows(EmptyResultDataAccessException.class, () -> portfolios.orders(1).save(order(3L, "PROCESSING")));
-        assertThrows(EmptyResultDataAccessException.class, () -> portfolios.orders(1).save(order(4L, "PROCESSING")));
+        assertThrows(EmptyResultDataAccessException.class, () -> portfolios.orders(1).save(order(3L)));
+        assertThrows(EmptyResultDataAccessException.class, () -> portfolios.orders(1).save(order(4L)));
         saved.setMutualFundId(3L);
         assertThrows(EmptyResultDataAccessException.class, () -> portfolios.orders(1).update(saved));
         saved.setMutualFundId(1L);
@@ -200,15 +254,14 @@ class MutualFundOrderPersistenceTest {
             assertThrows(DataIntegrityViolationException.class, () -> portfolios.orders(1).update(saved));
         }
         assertNull(portfolios.orders(1).findById(saved.getMutualFundOrderId()).getMutualFundTxnId());
-        var invalid = order(1L, "COMPLETE");
+        var invalid = order(1L);
         invalid.setMutualFundTxnId(3L);
         assertThrows(DataIntegrityViolationException.class, () -> portfolios.orders(1).save(invalid));
     }
 
-    private MutualFundOrder order(Long fundId, String status) {
+    private MutualFundOrder order(Long fundId) {
         var order = new MutualFundOrder();
         order.setMutualFundId(fundId);
-        order.setStatus(status);
         order.setTransactionType("BUY");
         order.setTradeDate(LocalDate.parse("03/02/2025", DateTimeFormatter.ofPattern("dd/MM/uuuu")));
         order.setOrderedAt(LocalTime.parse("12:07 AM", DateTimeFormatter.ofPattern("hh:mm a", Locale.ENGLISH)));

@@ -37,6 +37,46 @@ import com.trading.validation.MutualFundReferenceValidator;
 @Import(GlobalExceptionHandler.class)
 class MutualFundTxnControllerTest {
 
+    @Test void metadataRoundTripsThroughCreateUpdateAndAllReadEndpoints() throws Exception {
+        var timestamp = LocalDateTime.of(2026, 1, 15, 0, 0);
+        var txn = new MutualFundTxn(7L, 1L, BigDecimal.TEN, BigDecimal.ONE,
+                BigDecimal.TEN, timestamp, timestamp, timestamp, "BUY");
+        txn.setStatus("PROCESSING");
+        txn.setExchangeOrderId("00009876");
+        txn.setSettlementId("000123");
+        txn.setRemarks("Processing information");
+        txn.setTag("{\"tag\": [\"coinandroid\"]}");
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.update(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        String body = """
+                {"mutualFundId":1,"amount":10,"units":1,"avgPrice":10,
+                 "txnDate":"15-Jan-2026","transactionType":"BUY","status":"PROCESSING",
+                 "exchangeOrderId":"00009876","settlementId":"000123",
+                 "remarks":"Processing information","tag":"{\\"tag\\": [\\"coinandroid\\"]}"}
+                """;
+        for (var request : List.of(post("/api/mutual-fund-txns"), put("/api/mutual-fund-txns/7"))) {
+            mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().is2xxSuccessful())
+                    .andExpect(jsonPath("$.status", is(txn.getStatus())))
+                    .andExpect(jsonPath("$.exchangeOrderId", is(txn.getExchangeOrderId())))
+                    .andExpect(jsonPath("$.settlementId", is(txn.getSettlementId())))
+                    .andExpect(jsonPath("$.remarks", is(txn.getRemarks())))
+                    .andExpect(jsonPath("$.tag", is(txn.getTag())));
+        }
+        when(repository.findById(7L)).thenReturn(txn);
+        when(repository.findAll(any())).thenReturn(List.of(txn));
+        when(repository.findByMutualFundId(eq(1L), any())).thenReturn(List.of(txn));
+        for (String path : List.of("/api/mutual-fund-txns/7", "/api/mutual-fund-txns", "/api/mutual-fund-txns/mutual-fund/1")) {
+            String prefix = path.endsWith("/7") ? "$" : "$.content[0]";
+            mockMvc.perform(get(path)).andExpect(status().isOk())
+                    .andExpect(jsonPath(prefix + ".status", is(txn.getStatus())))
+                    .andExpect(jsonPath(prefix + ".exchangeOrderId", is(txn.getExchangeOrderId())))
+                    .andExpect(jsonPath(prefix + ".settlementId", is(txn.getSettlementId())))
+                    .andExpect(jsonPath(prefix + ".remarks", is(txn.getRemarks())))
+                    .andExpect(jsonPath(prefix + ".tag", is(txn.getTag())));
+        }
+    }
+
     @Autowired
     private MockMvc mockMvc;
 

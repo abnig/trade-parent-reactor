@@ -39,3 +39,41 @@ units/NAV to six decimal places, and creates owner-linked mutual-fund order
 history separately from completed transactions. Apply after V8 before running
 the updated fund repositories. It performs no historical backfill. See
 [Coin order field mapping and persistence notes](../../../../../../coin-order-schema.md).
+
+`V10__move_folio_to_mutual_fund.sql` moves the order folio to a nullable
+`mutual_fund.folio_number`; ISIN and plan already reside on the fund. Apply after
+V9 in one transaction with fund/order writers stopped. Conflicting distinct folios
+for a fund abort the migration without discarding data. Resolve these explicitly
+before retrying. The updated application requires V10. See the V10 upgrade and
+API contract in [Coin order notes](../../../../../../coin-order-schema.md).
+
+`V11__move_order_metadata_to_transactions.sql` moves status, exchange order ID,
+remarks, tag, and settlement ID from orders to nullable transaction TEXT columns.
+Apply after V10 atomically with order/transaction writers stopped. Unlinked orders
+containing metadata or conflicting values for one transaction abort the migration.
+No transactions are created automatically. The application now requires V11. See
+[transaction metadata and preflight checks](../../../../../../coin-order-schema.md).
+
+`V12__unique_broker_account_per_owner.sql` adds the composite constraint
+`uq_broker_account_name_account_owner` on `(broker_name, account_id, owner_user_id)`.
+Apply after V11. It uses ordinary column comparison and standard UNIQUE semantics:
+different owners may share broker/account values, and NULL owners remain distinct.
+It does not normalize names or identifiers. Duplicate inserts/updates use the
+existing REST data-constraint response (HTTP 400).
+
+Existing duplicate owned accounts cause the migration to fail without deleting
+or merging rows. Resolve those accounts and their fund references explicitly
+before retrying. This read-only check finds conflicting keys:
+
+```sql
+SELECT broker_name, account_id, owner_user_id, COUNT(*) AS account_count
+FROM mutual_fund_broker_account
+WHERE owner_user_id IS NOT NULL
+GROUP BY broker_name, account_id, owner_user_id
+HAVING COUNT(*) > 1;
+```
+
+`V13__relax_mutual_fund_isin_length.sql` removes the exact-length ISIN check and
+widens `mutual_fund.isin` to nullable TEXT. Apply after V12 before deploying the
+updated form/API, which accept `N/A` and other source text without length limits.
+Existing values and the optional-field update/clearing behavior are preserved.

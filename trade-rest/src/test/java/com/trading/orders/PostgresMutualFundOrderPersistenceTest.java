@@ -13,6 +13,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Always runs against container-managed PostgreSQL, using a fresh schema per test. */
 class PostgresMutualFundOrderPersistenceTest extends MutualFundOrderPersistenceTest {
+    @Test void unscopedFundRepositoryAcceptsIsinWithoutLengthRestrictions() {
+        verifyFundIsin(new MutualFundRepositoryImpl(jdbc));
+    }
+    @Test void unscopedTransactionRepositoryPreservesMetadata() {
+        verifyTransactionMetadata(new com.trading.repository.impl.MutualFundTxnRepositoryImpl(jdbc));
+    }
     private String schema;
     private DataSource source;
 
@@ -30,13 +36,17 @@ class PostgresMutualFundOrderPersistenceTest extends MutualFundOrderPersistenceT
     @Override protected String adaptMigration(String sql) { return sql; }
 
     @Override protected void migrate(String file) throws Exception {
-        if (!file.equals("V9__mutual_fund_orders.sql")) {
+        if (!file.equals("V9__mutual_fund_orders.sql") && !file.equals("V10__move_folio_to_mutual_fund.sql")
+                && !file.equals("V11__move_order_metadata_to_transactions.sql")
+                && !file.equals("V12__unique_broker_account_per_owner.sql")
+                && !file.equals("V13__relax_mutual_fund_isin_length.sql")) {
             super.migrate(file);
             return;
         }
         // Exercise the actual Flyway upgrade from an existing V8 portfolio schema.
         var flyway = Flyway.configure().dataSource(source).defaultSchema(schema)
-                .locations("classpath:db/migration").baselineOnMigrate(true).baselineVersion("8").load();
+                .locations("classpath:db/migration").baselineOnMigrate(true).baselineVersion("8")
+                .target(file.substring(1, file.indexOf("__"))).load();
         assertEquals(1, flyway.migrate().migrationsExecuted);
         flyway.validate();
         assertEquals(0, flyway.migrate().migrationsExecuted);
@@ -51,9 +61,11 @@ class PostgresMutualFundOrderPersistenceTest extends MutualFundOrderPersistenceT
         var fund = new MutualFund(null, 1L, "Scheme", null, null);
         fund.setIsin("INF123456789");
         fund.setPlan("verbatim plan");
+        fund.setFolioNumber("00001234/05");
         var saved = repository.save(fund);
         assertEquals("INF123456789", saved.getIsin());
         assertEquals("verbatim plan", saved.getPlan());
+        assertEquals("00001234/05", saved.getFolioNumber());
         assertEquals("INF123456789", repository.findByBrokerAccountId(1L,
                 com.trading.repository.PageRequest.of(0, 20)).getLast().getIsin());
         assertEquals("INF123456789", repository.findAll(
@@ -61,5 +73,13 @@ class PostgresMutualFundOrderPersistenceTest extends MutualFundOrderPersistenceT
         var updated = repository.update(new MutualFund(saved.getMutualFundId(), 1L, "Renamed", null, null));
         assertEquals("INF123456789", updated.getIsin());
         assertEquals("verbatim plan", updated.getPlan());
+        assertEquals("00001234/05", updated.getFolioNumber());
+        updated.setIsin("");
+        updated.setPlan("");
+        updated.setFolioNumber("");
+        var cleared = repository.update(updated);
+        assertNull(cleared.getIsin());
+        assertNull(cleared.getPlan());
+        assertNull(cleared.getFolioNumber());
     }
 }

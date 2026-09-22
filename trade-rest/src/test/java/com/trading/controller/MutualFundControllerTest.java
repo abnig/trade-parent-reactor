@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,6 +28,57 @@ import org.springframework.context.annotation.Import;
 @WebMvcTest(MutualFundController.class)
 @Import(GlobalExceptionHandler.class)
 class MutualFundControllerTest {
+
+    @Test
+    void acceptsFundMetadataOnCreateAndUpdateAndReturnsItOnEveryRead() throws Exception {
+        String body = """
+                {"brokerAccountId":5,"mutualFundName":"Index Fund",
+                 "isin":"INF123456789","plan":"Direct Growth","folioNumber":"00001234/05"}
+                """;
+        when(repository.save(any())).thenAnswer(invocation -> {
+            MutualFund fund = invocation.getArgument(0);
+            fund.setMutualFundId(10L);
+            return fund;
+        });
+        when(repository.update(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        for (var request : java.util.List.of(post("/api/mutual-funds"), put("/api/mutual-funds/10"))) {
+            mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().is2xxSuccessful())
+                    .andExpect(jsonPath("$.mutualFundId", is(10)))
+                    .andExpect(jsonPath("$.isin", is("INF123456789")))
+                    .andExpect(jsonPath("$.plan", is("Direct Growth")))
+                    .andExpect(jsonPath("$.folioNumber", is("00001234/05")));
+        }
+        var fund = new MutualFund(10L, 5L, "Index Fund", null, null);
+        fund.setIsin("INF123456789");
+        fund.setPlan("Direct Growth");
+        fund.setFolioNumber("00001234/05");
+        when(repository.findById(10L)).thenReturn(fund);
+        when(repository.findAll(any())).thenReturn(java.util.List.of(fund));
+        when(repository.findByBrokerAccountId(org.mockito.ArgumentMatchers.eq(5L), any()))
+                .thenReturn(java.util.List.of(fund));
+        for (String path : java.util.List.of("/api/mutual-funds/10", "/api/mutual-funds", "/api/mutual-funds/broker-account/5")) {
+            String prefix = path.endsWith("/10") ? "$" : "$.content[0]";
+            mockMvc.perform(get(path)).andExpect(status().isOk())
+                    .andExpect(jsonPath(prefix + ".isin", is("INF123456789")))
+                    .andExpect(jsonPath(prefix + ".plan", is("Direct Growth")))
+                    .andExpect(jsonPath(prefix + ".folioNumber", is("00001234/05")));
+        }
+    }
+
+    @Test
+    void acceptsIsinWithoutLengthRestrictionsAndExplicitClearing() throws Exception {
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.update(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        for (String isin : java.util.List.of("N/A", "short", "longer-than-twelve-characters", "")) {
+            for (var request : java.util.List.of(post("/api/mutual-funds"), put("/api/mutual-funds/10"))) {
+                mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"brokerAccountId\":5,\"mutualFundName\":\"Fund\",\"isin\":\"" + isin + "\"}"))
+                        .andExpect(status().is2xxSuccessful())
+                        .andExpect(jsonPath("$.isin", is(isin)));
+            }
+        }
+    }
 
     @Autowired
     private MockMvc mockMvc;
