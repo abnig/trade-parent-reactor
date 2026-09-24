@@ -14,7 +14,7 @@ External actors are a browser user, CSV-producing/export systems or an operator,
 ```mermaid
 flowchart LR
     User[Browser user] --> UI[trade-ui<br/>React/Vite]
-    UI -->|HTTP /api/*| REST[trade-rest<br/>Spring MVC :8082]
+    UI -->|HTTP /api/*| REST[trade-rest<br/>Spring MVC :8888]
     Operator[Operator / CSV exporter] -->|CSV files| Batch[trade-batch<br/>Spring Batch CLI]
     MCPClient[MCP client] -->|SSE + MCP messages| MCP[trade-mcp-server<br/>WebFlux :8081]
     REST --> DB[(PostgreSQL)]
@@ -60,7 +60,7 @@ No Java module directly depends on `trade-rest`, `trade-batch`, or `trade-mcp-se
 | Dependencies | Repository contracts, Spring MVC, Bean Validation. |
 | Tables | `mutual_fund_broker_account`, `mutual_fund`, `mutual_fund_txn`, `mutual_fund_value`. |
 | External interface | HTTP JSON API under `/api`. |
-| Configuration | `trade-rest/src/main/resources/application.properties`; port 8082 and PostgreSQL datasource. |
+| Configuration | `trade-rest/src/main/resources/application.properties`; port 8888 and PostgreSQL datasource. |
 | Risks | No authentication; broker-account create/update ID handling is incorrect; packaged jar start class is invalid. |
 
 ### `trade-batch`
@@ -118,7 +118,7 @@ No Java module directly depends on `trade-rest`, `trade-batch`, or `trade-mcp-se
 | Important classes | `App.jsx`, `api/api.js`, the five components under `src/components`. |
 | Dependencies | React/ReactDOM, browser Fetch API. |
 | External interface | Relative `/api/*` JSON requests. |
-| Configuration | `vite.config.js` proxies `/api` to localhost:8082 only in development. |
+| Configuration | `vite.config.js` proxies `/api` to localhost:8888 only in development. |
 | Risks | No authentication model, UI tests, production proxy configuration, or server-side portfolio calculation. |
 
 ## 4. Dependency Map and Bean Wiring
@@ -308,7 +308,7 @@ The development integration model is:
 sequenceDiagram
     participant Browser
     participant Vite as Vite dev server :5173
-    participant REST as REST API :8082
+    participant REST as REST API :8888
     Browser->>Vite: fetch('/api/mutual-funds')
     Vite->>REST: proxy request
     REST-->>Vite: JSON / ApiError
@@ -469,7 +469,7 @@ MCP Average-Buy-Sell-Price-and-Count invocation
 | Concern | REST | Batch | MCP |
 |---|---|---|---|
 | Application name | `trade-rest` | `csv-batch-processor` | `trade-mcp-server` |
-| Port/address | port 8082 | no server-specific setting | `127.0.0.1:8081` |
+| Port/address | port 8888 | no server-specific setting | `127.0.0.1:8081` |
 | DB URL | `jdbc:postgresql://localhost:5432/postgres` | same | same |
 | DB credentials | `${DB_USERNAME:postgres}`, `${DB_PASSWORD:password}` | same | same |
 | Batch settings | none | input paths, truncate, recursion, chunk/skip; Batch schema initialization disabled | Batch schema initialization disabled |

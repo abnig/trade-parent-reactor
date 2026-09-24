@@ -29,6 +29,7 @@ import com.trading.repository.MutualFundRepository;
 import com.trading.repository.MutualFundTxnRepository;
 import com.trading.repository.MutualFundValueRepository;
 import com.trading.repository.PageRequest;
+import com.trading.upload.ZerodhaTransactionUploadService;
 import com.trading.validation.MutualFundReferenceValidator;
 
 @WebMvcTest({
@@ -48,6 +49,7 @@ class PaginationControllerTest {
     @MockitoBean private MutualFundTxnRepository transactionRepository;
     @MockitoBean private MutualFundValueRepository valueRepository;
     @MockitoBean private MutualFundReferenceValidator referenceValidator;
+    @MockitoBean private ZerodhaTransactionUploadService uploadService;
 
     @Test
     void usesDefaultPaginationAndReturnsMetadata() throws Exception {

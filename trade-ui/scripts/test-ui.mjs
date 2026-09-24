@@ -19,7 +19,8 @@ try {
       }
     }
   })
-  const result = spawnSync(process.execPath, ['--test', 'src/api/api.test.js', join(output, 'view.test.cjs')], { stdio: 'inherit' })
+  const result = spawnSync(process.execPath,
+    ['--test', 'src/api/api.test.js', join(output, 'view.test.cjs'), 'scripts/serve-production.test.mjs'], { stdio: 'inherit' })
   process.exitCode = result.status ?? 1
 } finally {
   await rm(output, { recursive: true, force: true })

@@ -32,6 +32,8 @@ public class SecurityConfiguration {
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/auth/recovery/questions").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/password-reset/challenges",
                     "/api/auth/password-reset/verify", "/api/auth/password-reset/complete", "/api/auth/forgot-username").permitAll()
+                // The UI LaunchAgent waits for this readiness endpoint before it starts its local reverse proxy.
+                .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/api/**", "/actuator/**").authenticated()
                 .anyRequest().permitAll())
             .addFilterBefore(new CredentialVersionFilter(recovery), org.springframework.security.web.access.intercept.AuthorizationFilter.class)

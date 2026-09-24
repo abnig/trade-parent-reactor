@@ -64,7 +64,7 @@ No broker, queue, cache, cloud service, outgoing HTTP client, Kafka, or RabbitMQ
                     React/Vite SPA
                          │ HTTP /api/*
                          ▼
-              trade-rest : Spring MVC, port 8082
+              trade-rest : Spring MVC, port 8888
                          │
                          ▼
              trade-repository : JDBC contracts/impls
@@ -121,7 +121,7 @@ There is no explicit domain state machine. Mutual-fund lifecycle is CRUD, with `
 
 | Entry point | Responsibility |
 |---|---|
-| `com.trading.TradeRestApplication` | Starts REST API on port 8082. |
+| `com.trading.TradeRestApplication` | Starts REST API on port 8888. |
 | `com.trading.TradeBatchApplication` | Starts then launches trade CSV jobs. |
 | `com.trading.LedgerBalancesBatchApplication` | Starts then launches ledger CSV jobs. |
 | `com.trading.TradeMcpServerApplication` | Starts loopback-only MCP server on port 8081. |
@@ -136,7 +136,7 @@ There is no explicit domain state machine. Mutual-fund lifecycle is CRUD, with `
 | Fund transactions | `GET/POST /api/mutual-fund-txns`, `GET/PUT/DELETE /api/mutual-fund-txns/{id}`, `GET /api/mutual-fund-txns/mutual-fund/{mutualFundId}` |
 | Fund values | `GET/POST /api/mutual-fund-values`, `GET/PUT/DELETE /api/mutual-fund-values/{id}`, `GET /api/mutual-fund-values/mutual-fund/{mutualFundId}` |
 
-The React client centralizes these requests in `trade-ui/src/api/api.js`. During development, Vite proxies `/api` to `http://localhost:8082`.
+The React client centralizes these requests in `trade-ui/src/api/api.js`. During development, Vite proxies `/api` to `http://localhost:8888`.
 
 ### Pagination contract
 
@@ -286,7 +286,7 @@ Each backend executable has `src/main/resources/application.properties`.
 - `DB_USERNAME` and `DB_PASSWORD` can override configured credentials.
 - Batch properties control CSV directories, truncation, recursion, chunk sizes and skip limits.
 - Default CSV paths are developer-local paths under `/Users/abnig19/zerodha/...`.
-- MCP runs at `127.0.0.1:8081`; REST runs at port 8082.
+- MCP runs at `127.0.0.1:8081`; REST runs at port 8888.
 - No Spring profiles, environment-specific property files, secret store, or feature-flag mechanism was found.
 - `spring.ai.mcp.server.veersion` is misspelled and likely ignored.
 
@@ -503,18 +503,25 @@ run needs access to the container registry to download uncached images. Maven
 skip flags default to false; explicit command-line overrides still work.
 Frontend checks remain separate from the Maven lifecycle.
 
-The parent POM generates a separate HTML Surefire report for every Maven module
-at `<module>/target/site/surefire-report.html` during the `test` phase. This also
-runs as part of `mvn package` and `mvn clean verify`. Modules without tests receive
-an empty report; the parent reactor receives its own empty report. XML/text test
-results remain in `<module>/target/surefire-reports`. Generated reports stay under
-the Git-ignored `target` directories.
+The optional `html-test-reports` Maven profile generates a separate HTML Surefire
+report for every Maven module at `<module>/target/site/surefire-report.html`.
+Modules without tests receive an empty report; the parent reactor receives its own
+empty report. XML/text test results remain in `<module>/target/surefire-reports`.
+Generated reports stay under the Git-ignored `target` directories.
 
-If a test fails, Maven stops before that module's HTML reporting step. Generate
-HTML from the existing results without rerunning tests or clearing `target`:
+The report plugin is not thread-safe. For parallel verification plus HTML reports,
+use the two-stage helper, which runs reports only after the parallel reactor has
+completed:
 
 ```bash
-mvn surefire-report:report-only
+MAVEN_THREADS=1C scripts/verify-with-reports.sh -Pdev
+```
+
+To generate HTML from existing results without rerunning tests or clearing
+`target`, run the report-only profile sequentially:
+
+```bash
+mvn -Phtml-test-reports surefire-report:report-only
 ```
 
 JaCoCo 0.8.15 collects Java code coverage during tests and generates HTML and XML

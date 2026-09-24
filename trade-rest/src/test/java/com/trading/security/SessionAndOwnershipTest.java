@@ -120,6 +120,10 @@ class SessionAndOwnershipTest {
         mvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
     }
 
+    @Test void healthEndpointIsPublicForTheUiServiceReadinessCheck() throws Exception {
+        mvc.perform(get("/actuator/health")).andExpect(status().isOk());
+    }
+
     @Test void loginRestoresSessionAndLogoutInvalidatesIt() throws Exception {
         var session = new MockHttpSession();
         String oldId = session.getId();
