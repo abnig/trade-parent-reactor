@@ -1,6 +1,7 @@
 package com.trading.controller;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -11,7 +12,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import com.trading.model.result.FundInvestmentSummary;
@@ -21,6 +25,9 @@ import com.trading.model.MutualFundTxn;
 import com.trading.model.result.TransactionSummary;
 import com.trading.repository.MutualFundTxnRepository;
 import com.trading.repository.PageRequest;
+import com.trading.security.AccountPrincipal;
+import com.trading.upload.ZerodhaTransactionUpload;
+import com.trading.upload.ZerodhaTransactionUploadService;
 import com.trading.validation.MutualFundReferenceValidator;
 
 import jakarta.validation.Valid;
@@ -34,11 +41,14 @@ public class MutualFundTxnController {
 
     private final MutualFundTxnRepository repository;
     private final MutualFundReferenceValidator referenceValidator;
+    private final ZerodhaTransactionUploadService uploadService;
 
     public MutualFundTxnController(MutualFundTxnRepository repository,
-                                   MutualFundReferenceValidator referenceValidator) {
+                                   MutualFundReferenceValidator referenceValidator,
+                                   ZerodhaTransactionUploadService uploadService) {
         this.repository = repository;
         this.referenceValidator = referenceValidator;
+        this.uploadService = uploadService;
     }
 
     @GetMapping
@@ -96,6 +106,28 @@ public class MutualFundTxnController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(MutualFundTxnDto.from(savedTxn));
+    }
+
+    @PostMapping(value = "/zerodha-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ZerodhaTransactionUpload> uploadZerodhaTransactions(
+            @RequestPart("file") MultipartFile file) {
+        try {
+            return ResponseEntity.accepted().body(uploadService.stage(currentUser().getId(), file));
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
+        } catch (java.io.IOException exception) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Unable to stage the uploaded file.", exception);
+        }
+    }
+
+    private static AccountPrincipal currentUser() {
+        var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || !(authentication.getPrincipal() instanceof AccountPrincipal principal)) {
+            throw new org.springframework.security.authentication.AuthenticationCredentialsNotFoundException("Login required");
+        }
+        return principal;
     }
 
     @PutMapping("/{id}")

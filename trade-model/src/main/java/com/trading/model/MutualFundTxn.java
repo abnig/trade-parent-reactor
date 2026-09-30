@@ -28,6 +28,11 @@ public class MutualFundTxn {
     @NotNull(message = "Average price is required")
     @DecimalMin(value = "0.0", message = "Average price must not be negative")
     private BigDecimal avgPrice;
+    private String status;
+    private String exchangeOrderId;
+    private String remarks;
+    private String tag;
+    private String settlementId;
     private LocalDateTime createDate;
     private LocalDateTime updateDate;
 
@@ -59,6 +64,21 @@ public class MutualFundTxn {
         this.txnDate = txnDate;
         this.transactionType = TransactionType.valueOf(transactionType);
     }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public String getExchangeOrderId() { return exchangeOrderId; }
+    public void setExchangeOrderId(String exchangeOrderId) { this.exchangeOrderId = exchangeOrderId; }
+
+    public String getRemarks() { return remarks; }
+    public void setRemarks(String remarks) { this.remarks = remarks; }
+
+    public String getTag() { return tag; }
+    public void setTag(String tag) { this.tag = tag; }
+
+    public String getSettlementId() { return settlementId; }
+    public void setSettlementId(String settlementId) { this.settlementId = settlementId; }
 
     public Long getMutualFundTxnId() {
         return mutualFundTxnId;

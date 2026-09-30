@@ -114,8 +114,8 @@ test('analytics view buttons expose selection and switch to each view', () => {
   let selected = 'value'
   const element = AnalyticsViewSelector({ view: selected, onChange: value => { selected = value } })
   const buttons = element.props.children
-  assert.deepEqual(buttons.map(button => button.props['aria-pressed']), [true, false, false, false])
-  for (const [index, expected] of [[1, 'cash'], [2, 'holdings'], [3, 'transactions'], [0, 'value']]) {
+  assert.deepEqual(buttons.map(button => button.props['aria-pressed']), [true, false, false, false, false])
+  for (const [index, expected] of [[1, 'cash'], [2, 'holdings'], [3, 'transactions'], [4, 'returns'], [0, 'value']]) {
     buttons[index].props.onClick()
     assert.equal(selected, expected)
   }
@@ -133,6 +133,37 @@ test('cash flow view provides monthly/quarterly control, signed bars, and exact 
   const zeros = renderToStaticMarkup(<CashFlowChart rows={cashFlowHistory([], [], 1, '01-Jan-2026', '31-Jan-2026')} />)
   assert.doesNotMatch(zeros, /NaN|Infinity/)
   assert.match(zeros, /height="0"/)
+})
+
+test('cash-flow legend and bars omit SELL when the selected fund and range have no sales', () => {
+  const transactions = [txn('2026-01-01', 100, 10), txn('2026-02-01', 40, 4, 'SELL'),
+    txn('2026-01-15', 99, 9, 'SELL', 2)]
+  for (const period of ['monthly', 'quarterly']) {
+    const rows = cashFlowHistory(transactions, [], 1, '01-Jan-2026', '31-Jan-2026', period)
+    const html = renderToStaticMarkup(<CashFlowChart rows={rows} />)
+    const legend = /<div class="chart-legend">(.*?)<\/div>/.exec(html)[1]
+    assert.match(legend, /BUY/)
+    assert.match(legend, /Net flow/)
+    assert.doesNotMatch(legend, /SELL/)
+    assert.match(html, /No SELL cash flow in the selected range. BUY and net flow are equal/)
+    assert.match(html, /aria-label="BUY, Net flow by period/)
+    assert.doesNotMatch(html, /fill="#c2410c"|<title>[^<]*SELL/)
+    assert.equal((html.match(/<rect /g) || []).length, 2)
+    assert.equal(rows[0].sold, 0)
+    assert.equal(rows[0].net, rows[0].bought)
+  }
+})
+
+test('cash-flow legend colors match their bars and SELL appears when the range includes sales', () => {
+  const rows = cashFlowHistory([txn('2026-01-01', 100, 10), txn('2026-02-01', 40, 4, 'SELL')], [], 1)
+  const html = renderToStaticMarkup(<CashFlowChart rows={rows} />)
+  const legend = /<div class="chart-legend">(.*?)<\/div>/.exec(html)[1]
+  for (const [label, color] of [['BUY', '#2563eb'], ['SELL', '#c2410c'], ['Net flow', '#172033']]) {
+    assert.ok(legend.includes(`class="chart-bar-swatch" style="background:${color}" aria-hidden="true"></i>${label}`))
+    assert.ok(html.includes(`fill="${color}"`))
+  }
+  assert.match(html, /SELL -40.00/)
+  assert.match(html, /aria-label="BUY, SELL, Net flow by period/)
 })
 
 test('holdings view has independent unit/cost charts and a readable table without value snapshots', () => {
@@ -168,7 +199,7 @@ test('transactions show recorded numbers, missing prices, and paginate loaded hi
 })
 
 test('all detail views expose clear empty states without fabricated holdings or numeric errors', () => {
-  for (const [view, message] of [['cash', 'No dated history available'], ['holdings', 'No holdings history available'], ['transactions', 'No transactions in the selected range']]) {
+  for (const [view, message] of [['cash', 'No dated history available'], ['holdings', 'No holdings history available'], ['transactions', 'No transactions in the selected range'], ['returns', 'No value history available for returns and risk']]) {
     const html = renderToStaticMarkup(<AnalyticsDetails view={view} transactions={[]} values={[]} fundId={1} />)
     assert.ok(html.includes(message))
     assert.doesNotMatch(html, /<svg|NaN|Infinity/)
@@ -185,7 +216,7 @@ test('loading, failed requests, missing selection, and invalid ranges suppress e
     [{ error: 'History unavailable' }, 'Analytics history could not be loaded'],
     [{ fundId: '' }, 'Select a mutual fund'],
     [{ rangeError: 'From date must be on or before the to date.' }, 'Invalid date range']]) {
-    for (const view of ['cash', 'holdings', 'transactions']) {
+    for (const view of ['cash', 'holdings', 'transactions', 'returns']) {
       const html = renderToStaticMarkup(<AnalyticsResults fundId={1} {...state}>
         <AnalyticsViewSelector view={view} onChange={() => {}} />
         <AnalyticsDetails view={view} transactions={[]} values={[]} fundId={1} fromDate="01-Jan-2026" toDate="31-Jan-2026" />

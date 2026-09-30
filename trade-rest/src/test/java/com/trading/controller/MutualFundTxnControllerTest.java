@@ -5,11 +5,13 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import static org.mockito.ArgumentMatchers.any;
@@ -23,6 +25,9 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
@@ -32,10 +37,54 @@ import com.trading.exception.InvalidReferenceException;
 import com.trading.repository.MutualFundTxnRepository;
 import com.trading.model.result.TransactionSummary;
 import com.trading.validation.MutualFundReferenceValidator;
+import com.trading.model.LoginAccount;
+import com.trading.security.AccountPrincipal;
+import com.trading.upload.ZerodhaTransactionUpload;
+import com.trading.upload.ZerodhaTransactionUploadService;
 
 @WebMvcTest(MutualFundTxnController.class)
 @Import(GlobalExceptionHandler.class)
 class MutualFundTxnControllerTest {
+
+    @Test void metadataRoundTripsThroughCreateUpdateAndAllReadEndpoints() throws Exception {
+        var timestamp = LocalDateTime.of(2026, 1, 15, 0, 0);
+        var txn = new MutualFundTxn(7L, 1L, BigDecimal.TEN, BigDecimal.ONE,
+                BigDecimal.TEN, timestamp, timestamp, timestamp, "BUY");
+        txn.setStatus("PROCESSING");
+        txn.setExchangeOrderId("00009876");
+        txn.setSettlementId("000123");
+        txn.setRemarks("Processing information");
+        txn.setTag("{\"tag\": [\"coinandroid\"]}");
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.update(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        String body = """
+                {"mutualFundId":1,"amount":10,"units":1,"avgPrice":10,
+                 "txnDate":"15-Jan-2026","transactionType":"BUY","status":"PROCESSING",
+                 "exchangeOrderId":"00009876","settlementId":"000123",
+                 "remarks":"Processing information","tag":"{\\"tag\\": [\\"coinandroid\\"]}"}
+                """;
+        for (var request : List.of(post("/api/mutual-fund-txns"), put("/api/mutual-fund-txns/7"))) {
+            mockMvc.perform(request.contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().is2xxSuccessful())
+                    .andExpect(jsonPath("$.status", is(txn.getStatus())))
+                    .andExpect(jsonPath("$.exchangeOrderId", is(txn.getExchangeOrderId())))
+                    .andExpect(jsonPath("$.settlementId", is(txn.getSettlementId())))
+                    .andExpect(jsonPath("$.remarks", is(txn.getRemarks())))
+                    .andExpect(jsonPath("$.tag", is(txn.getTag())));
+        }
+        when(repository.findById(7L)).thenReturn(txn);
+        when(repository.findAll(any())).thenReturn(List.of(txn));
+        when(repository.findByMutualFundId(eq(1L), any())).thenReturn(List.of(txn));
+        for (String path : List.of("/api/mutual-fund-txns/7", "/api/mutual-fund-txns", "/api/mutual-fund-txns/mutual-fund/1")) {
+            String prefix = path.endsWith("/7") ? "$" : "$.content[0]";
+            mockMvc.perform(get(path)).andExpect(status().isOk())
+                    .andExpect(jsonPath(prefix + ".status", is(txn.getStatus())))
+                    .andExpect(jsonPath(prefix + ".exchangeOrderId", is(txn.getExchangeOrderId())))
+                    .andExpect(jsonPath(prefix + ".settlementId", is(txn.getSettlementId())))
+                    .andExpect(jsonPath(prefix + ".remarks", is(txn.getRemarks())))
+                    .andExpect(jsonPath(prefix + ".tag", is(txn.getTag())));
+        }
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -45,6 +94,52 @@ class MutualFundTxnControllerTest {
 
     @MockitoBean
     private MutualFundReferenceValidator referenceValidator;
+
+    @MockitoBean
+    private ZerodhaTransactionUploadService uploadService;
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void stagesAUserOwnedZerodhaTransactionFileWithoutCreatingTransactions() throws Exception {
+        var user = new AccountPrincipal(new LoginAccount(8L, "alice", "test", true, true, true, true,
+                java.util.Set.of("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities()));
+        var upload = new ZerodhaTransactionUpload(java.util.UUID.fromString("c6fd130f-6cc4-4c78-b529-a5d1726e9bb9"),
+                "orders.csv", 15, "UPLOADED");
+        when(uploadService.stage(eq(8L), any())).thenReturn(upload);
+
+        mockMvc.perform(multipart("/api/mutual-fund-txns/zerodha-upload")
+                        .file(new MockMultipartFile("file", "orders.csv", "text/csv", "header\nvalue\n".getBytes())))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.uploadId", is(upload.uploadId().toString())))
+                .andExpect(jsonPath("$.originalFilename", is("orders.csv")))
+                .andExpect(jsonPath("$.size", is(15)))
+                .andExpect(jsonPath("$.status", is("UPLOADED")));
+
+        verify(uploadService).stage(eq(8L), any());
+    }
+
+    @Test
+    void rejectsAnInvalidUploadWithoutCreatingTransactions() throws Exception {
+        var user = new AccountPrincipal(new LoginAccount(8L, "alice", "test", true, true, true, true,
+                java.util.Set.of("ROLE_USER")));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities()));
+        doThrow(new IllegalArgumentException("Upload a Zerodha transactions CSV file."))
+                .when(uploadService).stage(eq(8L), any());
+
+        mockMvc.perform(multipart("/api/mutual-fund-txns/zerodha-upload")
+                        .file(new MockMultipartFile("file", "orders.xlsx", "application/octet-stream", new byte[] {1})))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", is("Upload a Zerodha transactions CSV file.")));
+
+        verify(uploadService).stage(eq(8L), any());
+    }
 
     @Test
     void rejectsNegativeTransactionAmountsUnitsAndPrices() throws Exception {

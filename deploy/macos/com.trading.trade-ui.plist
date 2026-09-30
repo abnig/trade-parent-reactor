@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.trading.trade-ui</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/abnig19/Applications/trading/deploy/macos/launch-trade-ui.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>TRADE_UI_PORT</key>
+    <string>9999</string>
+    <key>TRADE_UI_DIST_DIR</key>
+    <string>/Users/abnig19/Applications/trading/trade-ui/dist</string>
+    <key>TRADE_UI_SERVER</key>
+    <string>/Users/abnig19/Applications/trading/trade-ui/serve-production.mjs</string>
+    <key>TRADE_REST_HOST</key>
+    <string>127.0.0.1</string>
+    <key>TRADE_REST_PORT</key>
+    <string>8888</string>
+    <key>TRADE_REST_HEALTH_PATH</key>
+    <string>/actuator/health</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/abnig19/Library/Logs/trading/trade-ui.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/abnig19/Library/Logs/trading/trade-ui.err.log</string>
+</dict>
+</plist>

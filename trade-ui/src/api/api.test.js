@@ -21,6 +21,19 @@ test('portfolio aggregation failures surface instead of returning partial totals
   await assert.rejects(api.analytics.portfolio(), /Portfolio unavailable/)
 })
 
+test('API failures are logged without logging request data', async (t) => {
+  const errors = []
+  t.mock.method(console, 'error', (...args) => errors.push(args))
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ message: 'Invalid upload.' }), { status: 400 }))
+
+  await assert.rejects(api.analytics.portfolio(), /Invalid upload/)
+
+  assert.deepEqual(errors, [[
+    'API request failed.',
+    { method: 'GET', url: '/api/analytics/portfolio', status: 400, message: 'Invalid upload.' }
+  ]])
+})
+
 test('analytics loads every transaction page for the selected fund', async (t) => {
   const urls = []
   t.mock.method(globalThis, 'fetch', async (url) => {
@@ -166,6 +179,21 @@ test('transaction create and update preserve date-only API values', async (t) =>
     ['/api/mutual-fund-txns', 'POST', txn],
     ['/api/mutual-fund-txns/7', 'PUT', txn]
   ])
+})
+
+test('transaction upload uses multipart FormData and CSRF without a JSON content type', async (t) => {
+  const file = new File(['date,amount'], 'orders.csv', { type: 'text/csv' })
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url === '/api/auth/csrf') return new Response(JSON.stringify({ headerName: 'X-CSRF-TOKEN', token: 'test-csrf' }))
+    assert.equal(url, '/api/mutual-fund-txns/zerodha-upload')
+    assert.equal(options.method, 'POST')
+    assert.equal(options.headers['X-CSRF-TOKEN'], 'test-csrf')
+    assert.equal(options.headers['Content-Type'], undefined)
+    assert.ok(options.body instanceof FormData)
+    assert.equal(options.body.get('file').name, 'orders.csv')
+    return new Response(JSON.stringify({ uploadId: 'abc', originalFilename: 'orders.csv', size: 11, status: 'UPLOADED' }), { status: 202 })
+  })
+  assert.equal((await api.transactions.upload(file)).status, 'UPLOADED')
 })
 
 test('fund investment overview loads server totals without transaction pagination', async (t) => {

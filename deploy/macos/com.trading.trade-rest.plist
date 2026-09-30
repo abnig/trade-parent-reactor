@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.trading.trade-rest</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/abnig19/Applications/trading/deploy/macos/launch-trade-rest.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>SPRING_PROFILES_ACTIVE</key>
+    <string>prod</string>
+    <key>SERVER_ADDRESS</key>
+    <string>127.0.0.1</string>
+    <key>SERVER_PORT</key>
+    <string>8888</string>
+    <key>TRADE_REST_JAR</key>
+    <string>/Users/abnig19/Applications/trading/trade-rest/trade-rest-0.0.1-SNAPSHOT.jar</string>
+    <key>TRADE_REST_ENV_FILE</key>
+    <string>/Users/abnig19/Library/Application Support/trading/trade-rest.env</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/abnig19/Library/Logs/trading/trade-rest.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/abnig19/Library/Logs/trading/trade-rest.err.log</string>
+</dict>
+</plist>

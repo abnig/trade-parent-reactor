@@ -1,10 +1,10 @@
 import DateInput from './DateInput'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import api from '../api/api'
 import Pagination from './Pagination'
 import { formatDisplayDate } from '../utils/date'
 
-const empty = { mutualFundId: '', transactionType: 'BUY', amount: '', units: '', avgPrice: '', txnDate: '' }
+const empty = { mutualFundId: '', transactionType: 'BUY', amount: '', units: '', avgPrice: '', txnDate: '', status: '', exchangeOrderId: '', remarks: '', tag: '', settlementId: '' }
 const initialPage = { page: 0, size: 20, totalPages: 0, totalElements: 0, first: true, last: true }
 
 export default function MutualFundTransactions() {
@@ -24,6 +24,9 @@ export default function MutualFundTransactions() {
   const [summaryLoading, setSummaryLoading] = useState(true)
   const [summaryError, setSummaryError] = useState('')
   const [summaryRefreshKey, setSummaryRefreshKey] = useState(0)
+  const [uploading, setUploading] = useState(false)
+  const [uploadMessage, setUploadMessage] = useState('')
+  const uploadInput = useRef(null)
 
   useEffect(() => {
     if (!selectedFundId) {
@@ -92,7 +95,8 @@ export default function MutualFundTransactions() {
       const data = {
         mutualFundId: Number(form.mutualFundId), transactionType: form.transactionType,
         amount: Number(form.amount), units: Number(form.units), avgPrice: Number(form.avgPrice),
-        txnDate: form.txnDate
+        txnDate: form.txnDate,
+        status: form.status, exchangeOrderId: form.exchangeOrderId, remarks: form.remarks, tag: form.tag, settlementId: form.settlementId
       }
       if (editingId) await api.transactions.update(editingId, { ...data, mutualFundTxnId: editingId })
       else await api.transactions.create(data)
@@ -121,9 +125,27 @@ export default function MutualFundTransactions() {
     setPaging((current) => ({ ...current, page: 0 }))
   }
 
+  const upload = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    try {
+      setUploading(true)
+      setError('')
+      const result = await api.transactions.upload(file)
+      setUploadMessage(`${result.originalFilename} was uploaded and is awaiting processing.`)
+    } catch (e) {
+      setUploadMessage('')
+      setError(e.message)
+    } finally {
+      setUploading(false)
+      event.target.value = ''
+    }
+  }
+
   return <section>
-    <div className="section-header"><div><h2>Mutual Fund Transactions</h2><p>Track purchases, redemptions and other transactions.</p></div><button className="primary" onClick={() => { reset(); setShowForm(true) }}>+ Add Transaction</button></div>
+    <div className="section-header"><div><h2>Mutual Fund Transactions</h2><p>Track purchases, redemptions and other transactions.</p></div><div className="section-actions"><button type="button" className="primary" onClick={() => { reset(); setShowForm(true) }}>Add Single Transaction</button><button type="button" className="primary" disabled={uploading} onClick={() => uploadInput.current?.click()}>{uploading ? 'Uploading…' : 'Upload Zerodha Transactions File'}</button><input ref={uploadInput} className="visually-hidden" type="file" accept=".csv,text/csv" onChange={upload} /></div></div>
     {error && <div className="error">{error}</div>}
+    {uploadMessage && <div className="success" role="status">{uploadMessage}</div>}
     {showForm && <form className="form-card" onSubmit={submit}><div className="form-grid">
       <label>Mutual Fund<select required value={form.mutualFundId} onChange={e => setForm({ ...form, mutualFundId: e.target.value })}><option value="">Select fund</option>{funds.map(f => <option key={f.mutualFundId} value={f.mutualFundId}>{f.mutualFundName}</option>)}</select></label>
       <label>Transaction Type<select value={form.transactionType} onChange={e => setForm({ ...form, transactionType: e.target.value })}><option value="BUY">BUY</option><option value="SELL">SELL</option></select></label>
@@ -131,6 +153,7 @@ export default function MutualFundTransactions() {
       <label>Units<input required type="number" min="0" step="0.001" value={form.units} onChange={e => setForm({ ...form, units: e.target.value })} /></label>
       <label>Average Price<input required type="number" min="0" step="0.001" value={form.avgPrice} onChange={e => setForm({ ...form, avgPrice: e.target.value })} /></label>
       <label>Transaction Date<DateInput required value={form.txnDate} onChange={value => setForm({ ...form, txnDate: value })} /></label>
+      <TransactionMetadataFields form={form} setForm={setForm} />
     </div><div className="form-actions"><button type="button" className="secondary" onClick={reset}>Cancel</button><button className="primary" type="submit">{editingId ? 'Update' : 'Create'}</button></div></form>}
     <div className="filter-card"><label>Filter by Mutual Fund<select value={selectedFundId} onChange={e => selectFund(e.target.value)}><option value="">All Mutual Funds</option>{funds.map(f => <option key={f.mutualFundId} value={f.mutualFundId}>{f.mutualFundName}</option>)}</select></label>{selectedFundId && <button className="secondary clear-filter" type="button" onClick={() => selectFund('')}>Clear Filter</button>}</div>
     {selectedFundId && <section className="transaction-summary" aria-label="Transaction summary">
@@ -140,8 +163,8 @@ export default function MutualFundTransactions() {
       </>}
     </section>}
     {!selectedFundId ? <FundInvestmentOverview funds={funds} loading={fundsLoading} error={fundsError} /> : <>
-    <div className="table-wrap"><table><thead><tr><th>Mutual Fund</th><th>Type</th><th>Amount</th><th>Units</th><th>Avg Price</th><th>Transaction Date</th><th>Actions</th></tr></thead><tbody>
-      {loading ? <tr><td colSpan="7" className="empty">Loading...</td></tr> : items.length === 0 ? <tr><td colSpan="7" className="empty">No transactions found.</td></tr> : items.map(t => <tr key={t.mutualFundTxnId}><td>{fundName(t.mutualFundId)}</td><td>{t.transactionType}</td><td>{formatNumber(t.amount)}</td><td>{formatNumber(t.units)}</td><td>{formatNumber(t.avgPrice)}</td><td>{formatDate(t.txnDate)}</td><td><div className="actions"><button onClick={() => { setForm({ mutualFundId: String(t.mutualFundId), transactionType: t.transactionType || 'BUY', amount: String(t.amount ?? ''), units: String(t.units ?? ''), avgPrice: String(t.avgPrice ?? ''), txnDate: toInputDate(t.txnDate) }); setEditingId(t.mutualFundTxnId); setShowForm(true) }}>Edit</button><button className="danger-text" onClick={() => remove(t.mutualFundTxnId)}>Delete</button></div></td></tr>)}
+    <div className="table-wrap"><table><thead><tr><th>Mutual Fund</th><th>Type</th><th>Amount</th><th>Units</th><th>Avg Price</th><th>Transaction Date</th><th>Order Metadata</th><th>Actions</th></tr></thead><tbody>
+      {loading ? <tr><td colSpan="8" className="empty">Loading...</td></tr> : items.length === 0 ? <tr><td colSpan="8" className="empty">No transactions found.</td></tr> : items.map(t => <tr key={t.mutualFundTxnId}><td>{fundName(t.mutualFundId)}</td><td>{t.transactionType}</td><td>{formatNumber(t.amount)}</td><td>{formatNumber(t.units)}</td><td>{formatNumber(t.avgPrice)}</td><td>{formatDate(t.txnDate)}</td><td><TransactionMetadataDetails transaction={t} /></td><td><div className="actions"><button onClick={() => { setForm({ mutualFundId: String(t.mutualFundId), transactionType: t.transactionType || 'BUY', amount: String(t.amount ?? ''), units: String(t.units ?? ''), avgPrice: String(t.avgPrice ?? ''), txnDate: toInputDate(t.txnDate), status: t.status ?? '', exchangeOrderId: t.exchangeOrderId ?? '', remarks: t.remarks ?? '', tag: t.tag ?? '', settlementId: t.settlementId ?? '' }); setEditingId(t.mutualFundTxnId); setShowForm(true) }}>Edit</button><button className="danger-text" onClick={() => remove(t.mutualFundTxnId)}>Delete</button></div></td></tr>)}
     </tbody></table></div>
     {!loading && <Pagination {...paging} loading={loading} onPrevious={() => setPaging(c => ({ ...c, page: c.page - 1 }))} onNext={() => setPaging(c => ({ ...c, page: c.page + 1 }))} onSizeChange={(size) => setPaging(c => ({ ...c, page: 0, size }))} />}
     </>}
@@ -172,4 +195,34 @@ export function FundInvestmentOverview({ funds, loading, error }) {
       </tr></tfoot>}
     </table></div>
   </section>
+}
+
+const metadataFields = [
+  ['status', 'Status'], ['exchangeOrderId', 'Exchange Order ID'],
+  ['settlementId', 'Settlement ID'], ['remarks', 'Remarks'], ['tag', 'Tag']
+]
+
+export function TransactionMetadataFields({ form, setForm }) {
+  return <>{metadataFields.map(([key, label]) => <label key={key}>{label}
+    {key === 'status'
+      ? <select value={form.status} onChange={event => setForm({ ...form, status: event.target.value })}>
+        <option value="">Select status</option>
+        {form.status && !['Processed', 'Completed'].includes(form.status) &&
+          <option value={form.status} disabled>Current: {form.status}</option>}
+        <option value="Processed">Processed</option>
+        <option value="Completed">Completed</option>
+      </select>
+      : key === 'remarks' || key === 'tag'
+      ? <textarea value={form[key]} onChange={event => setForm({ ...form, [key]: event.target.value })} />
+      : <input value={form[key]} onChange={event => setForm({ ...form, [key]: event.target.value })} />}
+  </label>)}</>
+}
+
+export function TransactionMetadataDetails({ transaction }) {
+  const present = metadataFields.filter(([key]) => transaction[key] != null && transaction[key] !== '')
+  if (!present.length) return '—'
+  return <details><summary>{transaction.status || 'View metadata'}</summary>
+    <dl>{present.map(([key, label]) => <div key={key}><dt>{label}</dt>
+      <dd style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{transaction[key]}</dd></div>)}</dl>
+  </details>
 }

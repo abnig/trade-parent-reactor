@@ -1,33 +1,50 @@
+const logRequestFailure = (method, url, error) => {
+  if (typeof console !== 'undefined' && typeof console.error === 'function') {
+    console.error('API request failed.', {
+      method,
+      url,
+      status: error?.status,
+      message: error?.message
+    })
+  }
+}
+
 const request = async (url, options = {}) => {
   const method = (options.method || 'GET').toUpperCase()
-  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
-    // Obtain a fresh token after session rotation at login/logout as well as on first use.
-    const csrfResponse = await fetch('/api/auth/csrf', { credentials: 'same-origin', cache: 'no-store' })
-    if (!csrfResponse.ok) throw new Error('Unable to verify your session. Please refresh and try again.')
-    const csrf = await csrfResponse.json()
-    headers[csrf.headerName] = csrf.token
-  }
-  const response = await fetch(url, { ...options, method, headers, credentials: 'same-origin', cache: 'no-store' })
+  try {
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
+    const headers = { ...(isFormData ? {} : { 'Content-Type': 'application/json' }), ...(options.headers || {}) }
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+      // Obtain a fresh token after session rotation at login/logout as well as on first use.
+      const csrfResponse = await fetch('/api/auth/csrf', { credentials: 'same-origin', cache: 'no-store' })
+      if (!csrfResponse.ok) throw new Error('Unable to verify your session. Please refresh and try again.')
+      const csrf = await csrfResponse.json()
+      headers[csrf.headerName] = csrf.token
+    }
+    const response = await fetch(url, { ...options, method, headers, credentials: 'same-origin', cache: 'no-store' })
 
-  if (!response.ok) {
-    let message = `Request failed: ${response.status}`
-    try {
-      const body = await response.json()
-      message = body.message || body.error || message
-    } catch {
-      // Ignore non-JSON error responses.
+    if (!response.ok) {
+      let message = `Request failed: ${response.status}`
+      try {
+        const body = await response.json()
+        message = body.message || body.error || message
+      } catch {
+        // Ignore non-JSON error responses.
+      }
+      if (response.status === 401 && (!url.startsWith('/api/auth/') || url.startsWith('/api/auth/profile')) && typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('session-expired'))
+      }
+      const error = new Error(message)
+      error.status = response.status
+      throw error
     }
-    if (response.status === 401 && (!url.startsWith('/api/auth/') || url.startsWith('/api/auth/profile')) && typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('session-expired'))
-    }
-    const error = new Error(message)
-    error.status = response.status
+
+    if (response.status === 204) return null
+    return response.json()
+  } catch (error) {
+    logRequestFailure(method, url, error)
     throw error
   }
-
-  if (response.status === 204) return null
-  return response.json()
 }
 
 const pagedUrl = (path, { page = 0, size = 20 } = {}) => {
@@ -104,6 +121,11 @@ export const api = {
     byFund: (mutualFundId, paging) => request(pagedUrl(`/api/mutual-fund-txns/mutual-fund/${mutualFundId}`, paging)),
     summary: ({ mutualFundId = 0 } = {}) => request(queryUrl('/api/mutual-fund-txns/summary', { mutualFundId })),
     create: (data) => request('/api/mutual-fund-txns', { method: 'POST', body: JSON.stringify(data) }),
+    upload: (file) => {
+      const body = new FormData()
+      body.append('file', file)
+      return request('/api/mutual-fund-txns/zerodha-upload', { method: 'POST', body })
+    },
     update: (id, data) => request(`/api/mutual-fund-txns/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     remove: (id) => request(`/api/mutual-fund-txns/${id}`, { method: 'DELETE' })
   },

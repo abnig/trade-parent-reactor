@@ -46,8 +46,8 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
                 INSERT INTO mutual_fund_txn
                     (mutual_fund_id,
                      amount,
-                     txn_date, units, avg_price, txn_type)
-                VALUES (?, ?, ?, ?, ?, ?)
+                     txn_date, units, avg_price, txn_type, status, exchange_order_id, remarks, tag, settlement_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING mutual_fund_txn_id
                 """;
 
@@ -59,7 +59,8 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
                 txn.getTxnDate(),
                 txn.getUnits(),
                 txn.getAvgPrice(),
-                txn.getTransactionType().name()
+                txn.getTransactionType().name(),
+                txn.getStatus(), txn.getExchangeOrderId(), txn.getRemarks(), txn.getTag(), txn.getSettlementId()
         );
 
         txn.setMutualFundTxnId(generatedId);
@@ -78,7 +79,7 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
 				       create_date,
 				       update_date,
 				       txn_date,
-				       txn_type
+				       txn_type, status, exchange_order_id, remarks, tag, settlement_id
 				FROM mutual_fund_txn
 				ORDER BY mutual_fund_txn_id
 				LIMIT ? OFFSET ?
@@ -103,7 +104,7 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
 				       create_date,
 				       update_date,
 				       txn_date,
-				       txn_type
+				       txn_type, status, exchange_order_id, remarks, tag, settlement_id
 				FROM mutual_fund_txn
 				WHERE mutual_fund_txn_id = ?
 				""";
@@ -122,7 +123,7 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
 				       create_date,
 				       update_date,
 				       txn_date,
-				       txn_type
+				       txn_type, status, exchange_order_id, remarks, tag, settlement_id
 				FROM mutual_fund_txn
 				WHERE mutual_fund_id = ?
 				ORDER BY txn_date DESC, mutual_fund_txn_id
@@ -171,12 +172,17 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
 				           units = ?,
 						   avg_price = ?,
 						   txn_type = ?,
+                           status = COALESCE(?, status),
+                           exchange_order_id = COALESCE(?, exchange_order_id),
+                           remarks = COALESCE(?, remarks),
+                           tag = COALESCE(?, tag),
+                           settlement_id = COALESCE(?, settlement_id),
 				           update_date = CURRENT_TIMESTAMP
 				       WHERE mutual_fund_txn_id = ?
 				       """;
 
 		jdbcTemplate.update(sql, txn.getMutualFundId(), txn.getAmount(), txn.getTxnDate(), txn.getUnits(),
-				txn.getAvgPrice(), txn.getTransactionType().name(), txn.getMutualFundTxnId());
+				txn.getAvgPrice(), txn.getTransactionType().name(), txn.getStatus(), txn.getExchangeOrderId(), txn.getRemarks(), txn.getTag(), txn.getSettlementId(), txn.getMutualFundTxnId());
 
 		return findById(txn.getMutualFundTxnId());
 	}
@@ -196,6 +202,12 @@ public class MutualFundTxnRepositoryImpl implements MutualFundTxnRepository {
 	private MutualFundTxn mapRow(ResultSet rs, int rowNum) throws java.sql.SQLException {
 
 		MutualFundTxn txn = new MutualFundTxn();
+        txn.setStatus(rs.getString("status"));
+        txn.setExchangeOrderId(rs.getString("exchange_order_id"));
+        txn.setRemarks(rs.getString("remarks"));
+        txn.setTag(rs.getString("tag"));
+        txn.setSettlementId(rs.getString("settlement_id"));
+
 
 		txn.setMutualFundTxnId(rs.getLong("mutual_fund_txn_id"));
 

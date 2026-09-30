@@ -28,7 +28,12 @@ public record MutualFundTxnDto(
         LocalDateTime createDate,
         LocalDateTime updateDate,
         @NotNull(message = "Transaction date is required") String txnDate,
-        @NotNull(message = "Transaction type is required") TransactionType transactionType) {
+        @NotNull(message = "Transaction type is required") TransactionType transactionType,
+        String status,
+        String exchangeOrderId,
+        String remarks,
+        String tag,
+        String settlementId) {
 
     private static final DateTimeFormatter DATE_FORMAT =
             DateTimeFormatter.ofPattern("dd-MMM-uuuu", Locale.ENGLISH)
@@ -61,6 +66,11 @@ public record MutualFundTxnDto(
         txn.setUpdateDate(updateDate);
         txn.setTxnDate(txnDate == null ? null : parseDate(txnDate).atStartOfDay());
         txn.setTransactionType(transactionType);
+        txn.setStatus(status);
+        txn.setExchangeOrderId(exchangeOrderId);
+        txn.setRemarks(remarks);
+        txn.setTag(tag);
+        txn.setSettlementId(settlementId);
         return txn;
     }
 
@@ -68,6 +78,7 @@ public record MutualFundTxnDto(
         return new MutualFundTxnDto(txn.getMutualFundTxnId(), txn.getMutualFundId(),
                 txn.getAmount(), txn.getUnits(), txn.getAvgPrice(), txn.getCreateDate(),
                 txn.getUpdateDate(), txn.getTxnDate() == null ? null
-                        : txn.getTxnDate().format(DATE_FORMAT), txn.getTransactionType());
+                        : txn.getTxnDate().format(DATE_FORMAT), txn.getTransactionType(),
+                txn.getStatus(), txn.getExchangeOrderId(), txn.getRemarks(), txn.getTag(), txn.getSettlementId());
     }
 }

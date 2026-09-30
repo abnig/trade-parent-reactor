@@ -53,16 +53,16 @@ final class OwnedTxnRepository extends OwnedPortfolioJdbc implements MutualFundT
 
     @Override
     public MutualFundTxn save(MutualFundTxn item) {
-        long id = insert("INSERT INTO mutual_fund_txn (mutual_fund_id, amount, txn_date, units, avg_price, txn_type) SELECT :mutual_fund_id, :amount, :txn_date, :units, :avg_price, :txn_type WHERE " + fundOwned(":mutual_fund_id"),
-                parameters().addValue("mutual_fund_id", item.getMutualFundId()).addValue("amount", item.getAmount()).addValue("txn_date", item.getTxnDate()).addValue("units", item.getUnits()).addValue("avg_price", item.getAvgPrice()).addValue("txn_type", item.getTransactionType().name()), "mutual_fund_txn_id");
+        long id = insert("INSERT INTO mutual_fund_txn (mutual_fund_id, amount, txn_date, units, avg_price, txn_type, status, exchange_order_id, remarks, tag, settlement_id) SELECT :mutual_fund_id, :amount, :txn_date, :units, :avg_price, :txn_type, :status, :exchange_order_id, :remarks, :tag, :settlement_id WHERE " + fundOwned(":mutual_fund_id"),
+                parameters().addValue("mutual_fund_id", item.getMutualFundId()).addValue("amount", item.getAmount()).addValue("txn_date", item.getTxnDate()).addValue("units", item.getUnits()).addValue("avg_price", item.getAvgPrice()).addValue("txn_type", item.getTransactionType().name()).addValue("status", item.getStatus()).addValue("exchange_order_id", item.getExchangeOrderId()).addValue("remarks", item.getRemarks()).addValue("tag", item.getTag()).addValue("settlement_id", item.getSettlementId()), "mutual_fund_txn_id");
         item.setMutualFundTxnId(id);
         return findById(id);
     }
 
     @Override
     public MutualFundTxn update(MutualFundTxn item) {
-        int rows = jdbc.update("UPDATE mutual_fund_txn SET mutual_fund_id = :mutual_fund_id, amount = :amount, txn_date = :txn_date, units = :units, avg_price = :avg_price, txn_type = :txn_type, update_date = CURRENT_TIMESTAMP WHERE mutual_fund_txn_id = :id AND " + scope() + " AND " + fundOwned(":mutual_fund_id"),
-                parameters().addValue("mutual_fund_id", item.getMutualFundId()).addValue("amount", item.getAmount()).addValue("txn_date", item.getTxnDate()).addValue("units", item.getUnits()).addValue("avg_price", item.getAvgPrice()).addValue("txn_type", item.getTransactionType().name()).addValue("id", item.getMutualFundTxnId()));
+        int rows = jdbc.update("UPDATE mutual_fund_txn SET mutual_fund_id = :mutual_fund_id, amount = :amount, txn_date = :txn_date, units = :units, avg_price = :avg_price, txn_type = :txn_type, status = COALESCE(:status, status), exchange_order_id = COALESCE(:exchange_order_id, exchange_order_id), remarks = COALESCE(:remarks, remarks), tag = COALESCE(:tag, tag), settlement_id = COALESCE(:settlement_id, settlement_id), update_date = CURRENT_TIMESTAMP WHERE mutual_fund_txn_id = :id AND " + scope() + " AND " + fundOwned(":mutual_fund_id"),
+                parameters().addValue("mutual_fund_id", item.getMutualFundId()).addValue("amount", item.getAmount()).addValue("txn_date", item.getTxnDate()).addValue("units", item.getUnits()).addValue("avg_price", item.getAvgPrice()).addValue("txn_type", item.getTransactionType().name()).addValue("status", item.getStatus()).addValue("exchange_order_id", item.getExchangeOrderId()).addValue("remarks", item.getRemarks()).addValue("tag", item.getTag()).addValue("settlement_id", item.getSettlementId()).addValue("id", item.getMutualFundTxnId()));
         requireUpdated(rows);
         return findById(item.getMutualFundTxnId());
     }
@@ -99,6 +99,12 @@ final class OwnedTxnRepository extends OwnedPortfolioJdbc implements MutualFundT
 	private MutualFundTxn mapRow(ResultSet rs, int rowNum) throws java.sql.SQLException {
 
 		MutualFundTxn txn = new MutualFundTxn();
+        txn.setStatus(rs.getString("status"));
+        txn.setExchangeOrderId(rs.getString("exchange_order_id"));
+        txn.setRemarks(rs.getString("remarks"));
+        txn.setTag(rs.getString("tag"));
+        txn.setSettlementId(rs.getString("settlement_id"));
+
 
 		txn.setMutualFundTxnId(rs.getLong("mutual_fund_txn_id"));
 
