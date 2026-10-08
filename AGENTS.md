@@ -113,3 +113,32 @@ Before implementing a significant feature:
 5. Implement the smallest appropriate change.
 6. Run relevant tests and builds.
 7. Report changed files and verification results.
+
+## Retaining project knowledge
+
+The user has requested that learning be retained every time we work on this app.
+
+- At the start of each task, read `docs/PROJECT_UNDERSTANDING.md`, the relevant
+  linked appendices, and recent entries in
+  `docs/project-understanding/LEARNING_LOG.md`. Consult this knowledge before
+  asking questions whose answers may already be documented or in the repository.
+- Check the current checkout, branch, commit and existing changes. Treat dated
+  findings as a starting point; verify relevant source and runtime assumptions
+  before relying on them for a change.
+- Before finishing each task, retain material new findings, user decisions,
+  business rules, contract changes, troubleshooting causes and fixes, verification
+  results, and unresolved gaps. Update the relevant report sections and append a
+  concise dated entry to `LEARNING_LOG.md` with links to the affected evidence.
+  Do not add repetitive entries when nothing new was learned.
+- Cite concrete source files and symbols, and distinguish code-, test- and
+  runtime-verified findings from inferences and unresolved questions. Record the
+  investigated commit and any relevant uncommitted changes.
+- Correct superseded descriptions while preserving the dates and scope of
+  historical test results and schema snapshots. Never present an old successful
+  check as verification of the current checkout or running service.
+- Keep repository documentation as the detailed handoff and persistent assistant
+  memory as a concise pointer to it. The user's standing request authorizes
+  retaining app-related learning; follow the memory system's update mechanism.
+- Never retain credentials, tokens, private records or personal financial data
+  in these notes. This maintenance instruction does not authorize commits,
+  pushes, deployments, database changes or service restarts.

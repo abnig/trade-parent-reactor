@@ -1,4 +1,5 @@
 import DateInput from './DateInput'
+import CoinUploadForm from './CoinUploadForm'
 import { useEffect, useRef, useState } from 'react'
 import api from '../api/api'
 import Pagination from './Pagination'
@@ -26,6 +27,7 @@ export default function MutualFundTransactions() {
   const [summaryRefreshKey, setSummaryRefreshKey] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [uploadMessage, setUploadMessage] = useState('')
+  const [uploadFile, setUploadFile] = useState(null)
   const uploadInput = useRef(null)
 
   useEffect(() => {
@@ -125,27 +127,24 @@ export default function MutualFundTransactions() {
     setPaging((current) => ({ ...current, page: 0 }))
   }
 
-  const upload = async (event) => {
+  const upload = (event) => {
     const file = event.target.files?.[0]
-    if (!file) return
-    try {
-      setUploading(true)
-      setError('')
-      const result = await api.transactions.upload(file)
-      setUploadMessage(`${result.originalFilename} was uploaded and is awaiting processing.`)
-    } catch (e) {
-      setUploadMessage('')
-      setError(e.message)
-    } finally {
-      setUploading(false)
-      event.target.value = ''
-    }
+    if (file) { setUploadFile(file); setUploadMessage(''); setError('') }
+    event.target.value = ''
+  }
+
+  const imported = (result) => {
+    const counts = result.importResult
+    setUploadFile(null)
+    setUploadMessage(`${result.originalFilename}: ${counts.records} records processed, ${counts.inserted} orders added, ${counts.updated} updated, ${counts.unchanged} unchanged, ${counts.posted} transactions posted.`)
   }
 
   return <section>
-    <div className="section-header"><div><h2>Mutual Fund Transactions</h2><p>Track purchases, redemptions and other transactions.</p></div><div className="section-actions"><button type="button" className="primary" onClick={() => { reset(); setShowForm(true) }}>Add Single Transaction</button><button type="button" className="primary" disabled={uploading} onClick={() => uploadInput.current?.click()}>{uploading ? 'Uploading…' : 'Upload Zerodha Transactions File'}</button><input ref={uploadInput} className="visually-hidden" type="file" accept=".csv,text/csv" onChange={upload} /></div></div>
+    <div className="section-header"><div><h2>Mutual Fund Transactions</h2><p>Track purchases, redemptions and other transactions.</p></div><div className="section-actions"><button type="button" className="primary" onClick={() => { reset(); setShowForm(true) }}>Add Single Transaction</button><button type="button" className="primary" disabled={uploading} onClick={() => uploadInput.current?.click()}>{uploading ? 'Importing…' : 'Upload Zerodha Transactions File'}</button><input ref={uploadInput} className="visually-hidden" type="file" accept=".csv,text/csv" onChange={upload} /></div></div>
     {error && <div className="error">{error}</div>}
     {uploadMessage && <div className="success" role="status">{uploadMessage}</div>}
+    {uploadFile && <CoinUploadForm file={uploadFile} uploading={uploading} setUploading={setUploading}
+      onCancel={() => setUploadFile(null)} onImported={imported} onSettled={() => { reload(); reloadSummary() }} />}
     {showForm && <form className="form-card" onSubmit={submit}><div className="form-grid">
       <label>Mutual Fund<select required value={form.mutualFundId} onChange={e => setForm({ ...form, mutualFundId: e.target.value })}><option value="">Select fund</option>{funds.map(f => <option key={f.mutualFundId} value={f.mutualFundId}>{f.mutualFundName}</option>)}</select></label>
       <label>Transaction Type<select value={form.transactionType} onChange={e => setForm({ ...form, transactionType: e.target.value })}><option value="BUY">BUY</option><option value="SELL">SELL</option></select></label>

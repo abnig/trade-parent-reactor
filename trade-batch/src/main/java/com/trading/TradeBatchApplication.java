@@ -11,6 +11,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import com.trading.service.BatchJobService;
 
 @SpringBootApplication
+@org.springframework.context.annotation.ComponentScan(basePackages = "com.trading", excludeFilters =
+        @org.springframework.context.annotation.ComponentScan.Filter(type = org.springframework.context.annotation.FilterType.REGEX, pattern = "com\\.trading\\.coin\\..*"))
 @EnableBatchProcessing
 public class TradeBatchApplication implements CommandLineRunner {
 

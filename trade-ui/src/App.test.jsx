@@ -453,3 +453,4 @@ test('summary formats metrics and explains opening balances and snapshot timing'
   assert.match(empty, /Unavailable/)
   assert.doesNotMatch(empty, /NaN|Infinity/)
 })
+import './components/CoinUploadForm.test.jsx'

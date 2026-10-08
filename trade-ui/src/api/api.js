@@ -25,9 +25,11 @@ const request = async (url, options = {}) => {
 
     if (!response.ok) {
       let message = `Request failed: ${response.status}`
+      let fieldErrors = {}
       try {
         const body = await response.json()
         message = body.message || body.error || message
+        fieldErrors = body.fieldErrors || {}
       } catch {
         // Ignore non-JSON error responses.
       }
@@ -36,6 +38,7 @@ const request = async (url, options = {}) => {
       }
       const error = new Error(message)
       error.status = response.status
+      error.fieldErrors = fieldErrors
       throw error
     }
 
@@ -121,9 +124,10 @@ export const api = {
     byFund: (mutualFundId, paging) => request(pagedUrl(`/api/mutual-fund-txns/mutual-fund/${mutualFundId}`, paging)),
     summary: ({ mutualFundId = 0 } = {}) => request(queryUrl('/api/mutual-fund-txns/summary', { mutualFundId })),
     create: (data) => request('/api/mutual-fund-txns', { method: 'POST', body: JSON.stringify(data) }),
-    upload: (file) => {
+    upload: (file, options) => {
       const body = new FormData()
       body.append('file', file)
+      if (options) body.append('options', new Blob([JSON.stringify(options)], { type: 'application/json' }))
       return request('/api/mutual-fund-txns/zerodha-upload', { method: 'POST', body })
     },
     update: (id, data) => request(`/api/mutual-fund-txns/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

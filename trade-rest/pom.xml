@@ -10,6 +10,23 @@
 	<artifactId>trade-rest</artifactId>
 
 	<dependencies>
+        <dependency>
+            <groupId>com.trading</groupId>
+            <artifactId>trade-batch</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <classifier>coin-library</classifier>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-batch</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- Core only: no Boot Batch auto-configuration in the REST root context. -->
+        <dependency>
+            <groupId>org.springframework.batch</groupId>
+            <artifactId>spring-batch-core</artifactId>
+        </dependency>
         <!-- Starts disposable PostgreSQL for every database regression build. -->
         <dependency>
             <groupId>org.testcontainers</groupId>

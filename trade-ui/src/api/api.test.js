@@ -2,6 +2,34 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import api from './api.js'
 
+test('Coin upload sends JSON options and file to the existing route with CSRF', async (t) => {
+  const file = new File(['synthetic'], 'orders.csv', { type: 'text/csv' })
+  const options = { brokerAccountId: 1, periodStart: '2026-10-01', periodEnd: '2026-10-31', dateFormat: 'dd/MM/uuuu', postingPolicy: 'ORDER_ONLY', fundOverrides: {} }
+  t.mock.method(globalThis, 'fetch', async (url, request) => {
+    if (url === '/api/auth/csrf') return new Response(JSON.stringify({ headerName: 'X-CSRF-TOKEN', token: 'csrf' }))
+    assert.equal(url, '/api/mutual-fund-txns/zerodha-upload')
+    assert.equal(request.headers['X-CSRF-TOKEN'], 'csrf')
+    assert.equal(request.headers['Content-Type'], undefined)
+    assert.equal(request.body.get('file').name, 'orders.csv')
+    assert.equal(request.body.get('options').type, 'application/json')
+    assert.deepEqual(JSON.parse(await request.body.get('options').text()), options)
+    return new Response(JSON.stringify({ status: 'COMPLETED', importResult: { records: 1 } }))
+  })
+  assert.equal((await api.transactions.upload(file, options)).status, 'COMPLETED')
+})
+
+test('Coin validation errors retain per-record diagnostics for the upload form', async (t) => {
+  t.mock.method(console, 'error', () => {})
+  t.mock.method(globalThis, 'fetch', async url => url === '/api/auth/csrf'
+    ? new Response(JSON.stringify({ headerName: 'X-CSRF-TOKEN', token: 'csrf' }))
+    : new Response(JSON.stringify({ message: 'Invalid CSV', fieldErrors: { 'record[2].fund': 'FUND_MAPPING_REQUIRED' } }), { status: 422 }))
+  await assert.rejects(api.transactions.upload(new File(['synthetic'], 'a.csv'), {}), error => {
+    assert.equal(error.status, 422)
+    assert.deepEqual(error.fieldErrors, { 'record[2].fund': 'FUND_MAPPING_REQUIRED' })
+    return true
+  })
+})
+
 test('portfolio analytics uses one authenticated aggregate request with optional date filters', async (t) => {
   const urls = []
   t.mock.method(globalThis, 'fetch', async (url, options) => {

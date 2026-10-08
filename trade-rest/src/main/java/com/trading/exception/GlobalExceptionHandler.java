@@ -26,6 +26,30 @@ public class GlobalExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(com.trading.upload.CoinUploadException.class)
+    public ResponseEntity<ApiError> handleCoinUpload(com.trading.upload.CoinUploadException exception, HttpServletRequest request) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        exception.problems().forEach(p -> fields.merge("record[" + p.record() + "]." + p.field(), p.code(), (a, b) -> a + ", " + b));
+        return error(exception.status(), exception.status().getReasonPhrase(), exception.getMessage(), request, fields, exception);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleUploadLimit(Exception exception, HttpServletRequest request) {
+        return error(HttpStatus.PAYLOAD_TOO_LARGE, "Upload too large", "The upload exceeds the configured size limit.", request, Map.of(), exception);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+    public ResponseEntity<ApiError> handleMissingPart(Exception exception, HttpServletRequest request) {
+        return error(HttpStatus.BAD_REQUEST, "Invalid upload", "A required upload part is missing.", request, Map.of(), exception);
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiError> handleUploadMediaType(Exception exception, HttpServletRequest request) {
+        String message = request.getRequestURI().equals("/api/mutual-fund-txns/zerodha-upload")
+                ? "Use multipart form data with an application/json options part." : "Request content type is not supported.";
+        return error(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported media type", message, request, Map.of(), exception);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(
             MethodArgumentNotValidException exception, HttpServletRequest request) {

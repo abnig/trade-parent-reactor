@@ -1,0 +1,208 @@
+{
+  "commit": "70b9f2c2e8621ed396019c6378c1a61b019cf701",
+  "backend_command": "mvn -o verify -Pdev",
+  "backend_finished_at": "2026-10-06T20:26:49+05:30",
+  "backend_totals": {
+    "tests": 211,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "suite": "com.trading.analytics.PortfolioAnalyticsTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:49.427514+05:30"
+    },
+    {
+      "suite": "com.trading.analytics.PostgresPortfolioAnalyticsTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:48.671537+05:30"
+    },
+    {
+      "suite": "com.trading.controller.MutualFundControllerTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:28.611737+05:30"
+    },
+    {
+      "suite": "com.trading.controller.MutualFundTxnControllerTest",
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:29.925767+05:30"
+    },
+    {
+      "suite": "com.trading.controller.MutualFundValueControllerTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:29.720871+05:30"
+    },
+    {
+      "suite": "com.trading.controller.PaginationControllerTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:30.063292+05:30"
+    },
+    {
+      "suite": "com.trading.controller.RegistrationControllerTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:29.546965+05:30"
+    },
+    {
+      "suite": "com.trading.dto.PagedResponseTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:25:20.305399+05:30"
+    },
+    {
+      "suite": "com.trading.dto.TransactionSummaryTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:25:20.300500+05:30"
+    },
+    {
+      "suite": "com.trading.orders.MutualFundOrderPersistenceTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:45.910327+05:30"
+    },
+    {
+      "suite": "com.trading.orders.PostgresFundFolioMigrationTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:46.274729+05:30"
+    },
+    {
+      "suite": "com.trading.orders.PostgresMutualFundOrderPersistenceTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:45.802738+05:30"
+    },
+    {
+      "suite": "com.trading.orders.PostgresOrderMetadataMigrationTest",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:39.303185+05:30"
+    },
+    {
+      "suite": "com.trading.profile.PostgresUserProfileTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:37.321097+05:30"
+    },
+    {
+      "suite": "com.trading.profile.UserProfileTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:33.009247+05:30"
+    },
+    {
+      "suite": "com.trading.recovery.PasswordRecoveryTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:25:57.826618+05:30"
+    },
+    {
+      "suite": "com.trading.recovery.PostgresPasswordRecoveryTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:28.272527+05:30"
+    },
+    {
+      "suite": "com.trading.recovery.SmtpResetMailSenderTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:28.332471+05:30"
+    },
+    {
+      "suite": "com.trading.repository.PostgresBrokerAccountUniquenessTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:25:25.201371+05:30"
+    },
+    {
+      "suite": "com.trading.repository.RegistrationPersistenceTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:25:20.781857+05:30"
+    },
+    {
+      "suite": "com.trading.security.SessionAndOwnershipTest",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:25:29.771927+05:30"
+    },
+    {
+      "suite": "com.trading.upload.ZerodhaTransactionUploadServiceTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:46.297481+05:30"
+    },
+    {
+      "suite": "com.trading.validation.MutualFundReferenceValidatorTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report_modified_at": "2026-10-06T20:26:46.288059+05:30"
+    }
+  ],
+  "frontend": {
+    "command": "npm --prefix trade-ui test",
+    "tests": 114,
+    "passed": 114,
+    "failed": 0,
+    "skipped": 0,
+    "kind": "Node SSR/pure helper/mocked fetch + temporary loopback proxy; no browser"
+  },
+  "build": "npm --prefix trade-ui run build passed",
+  "clean_build": false,
+  "coverage_percent_claimed": false
+}

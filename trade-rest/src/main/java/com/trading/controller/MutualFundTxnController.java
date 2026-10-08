@@ -110,8 +110,10 @@ public class MutualFundTxnController {
 
     @PostMapping(value = "/zerodha-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ZerodhaTransactionUpload> uploadZerodhaTransactions(
-            @RequestPart("file") MultipartFile file) {
+            @RequestPart("file") MultipartFile file,
+            @Valid @RequestPart(value = "options", required = false) com.trading.upload.CoinUploadOptions options) {
         try {
+            if (options != null) return ResponseEntity.ok(uploadService.importFile(currentUser().getId(), file, options));
             return ResponseEntity.accepted().body(uploadService.stage(currentUser().getId(), file));
         } catch (IllegalArgumentException exception) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);

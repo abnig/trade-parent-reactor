@@ -14,7 +14,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  */
 public final class PostgresTestDatabase {
     private static final Set<String> DATABASES = Set.of(
-            "analytics_test", "profile_test", "recovery_test", "order_test");
+            "analytics_test", "profile_test", "recovery_test", "order_test", "coin_upload_test");
     private static final Map<String, PostgreSQLContainer> CONTAINERS = new HashMap<>();
 
     private PostgresTestDatabase() { }
