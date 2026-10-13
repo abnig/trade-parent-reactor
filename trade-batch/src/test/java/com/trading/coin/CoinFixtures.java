@@ -4,6 +4,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.*;
+
+import com.trading.coin.batch.reader.CoinCsvReader;
+import com.trading.coin.batch.validator.CoinRecordValidator;
 import com.trading.model.coin.*;
 
 final class CoinFixtures {

@@ -53,7 +53,7 @@ class ZerodhaTransactionUploadServiceTest {
     }
 
     @Test void forwardsSessionOwnerAndPreservesFileOnlyStagingIndependently() {
-        var runtime = new com.trading.coin.CoinImportRuntime(null, 1) {
+        var runtime = new com.trading.coin.service.CoinImportRuntime(null, 1) {
             @Override public com.trading.model.coin.CoinImportResult importBytes(byte[] bytes, com.trading.model.coin.CoinImportOptions policy, Path work) {
                 assertEquals(7, policy.ownerId()); assertEquals(1, policy.accountId()); assertEquals("synthetic", new String(bytes));
                 return new com.trading.model.coin.CoinImportResult(9, "COMPLETED", 1, 1, 0, 0, 0);
@@ -68,7 +68,7 @@ class ZerodhaTransactionUploadServiceTest {
     @Test void boundedConcurrentImportsReturn429AndTheSlotIsReleased() throws Exception {
         var entered = new java.util.concurrent.CountDownLatch(1);
         var release = new java.util.concurrent.CountDownLatch(1);
-        var runtime = new com.trading.coin.CoinImportRuntime(null, 1) {
+        var runtime = new com.trading.coin.service.CoinImportRuntime(null, 1) {
             @Override public com.trading.model.coin.CoinImportResult importBytes(byte[] bytes, com.trading.model.coin.CoinImportOptions policy, Path work) throws Exception {
                 entered.countDown();
                 if (!release.await(10, java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("Test worker timed out");
@@ -90,7 +90,7 @@ class ZerodhaTransactionUploadServiceTest {
     }
 
     @Test void stripsPrivateExceptionDetailsAndReleasesTheSlotAfterFailure() {
-        var runtime = new com.trading.coin.CoinImportRuntime(null, 1) {
+        var runtime = new com.trading.coin.service.CoinImportRuntime(null, 1) {
             @Override public com.trading.model.coin.CoinImportResult importBytes(byte[] bytes, com.trading.model.coin.CoinImportOptions policy, Path work) {
                 throw new org.springframework.dao.DataAccessResourceFailureException("private database detail");
             }

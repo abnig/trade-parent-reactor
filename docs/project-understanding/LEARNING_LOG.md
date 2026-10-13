@@ -219,3 +219,38 @@ Do not copy credentials, tokens, private records or personal financial data here
   UI build, with their documented scope and limitations. This entry records
   publication authorization and preparation; the Git commit/remote refs provide
   the resulting publication evidence.
+
+## 2026-10-09 — Isolate REST startup from Eclipse's full batch workspace output
+
+- **Baseline/trigger:** clean `feature/coin-batch-zerodha-upload` at
+  `4f2dc67b4a5cbb42461b5d79756194f3cb04cbf2`. User supplied an early REST startup
+  condition failure; the deepest `Caused by` was not included.
+- **R/C finding:** Eclipse m2e's persisted classpath resolves `coin-library` to
+  the entire `trade-batch` workspace project, despite the filtered packaged JAR.
+  A scan of that output discovers both legacy launchers/jobs and the standalone
+  Coin launcher, which imports private Coin configuration into REST.
+- **T reproduction/fix:** the pre-fix workspace context fails on conflicting
+  `taskExecutor` beans. [TradeRestApplication](../../trade-rest/src/main/java/com/trading/TradeRestApplication.java)
+  now explicitly excludes batch/Coin packages, standalone launchers and legacy
+  batch services, while preserving Boot's default filters and the upload bridge.
+  [RestWorkspaceStartupTest](../../trade-rest/src/test/java/com/trading/startup/RestWorkspaceStartupTest.java)
+  uses the actual full batch output to verify both scan isolation and web context
+  startup without root jobs/runners. No dependency/module/contract changes.
+- **T verification:** `mvn -o verify -pl trade-rest -am` passed **272 tests
+  (47 batch + 225 REST)**, zero failures/errors/skips, plus packaging. Real
+  HTTP/PostgreSQL upload regression still passes. The packaged REST application
+  class matches workspace output. Details and logs are in
+  [Verification](VERIFICATION.md#rest-workspace-startup-isolation--9-october-2026);
+  [components](COMPONENTS.md#coin-upload-bridge--9-october-2026) and the main
+  report now describe the additional workspace startup boundary.
+- **U/scope:** the reproduced collision is confirmed, but cannot be equated to
+  the exact original exception without its omitted cause. Live Eclipse startup
+  was not rerun. No application DB access/migration, legacy runner execution,
+  deployment, user-service restart, commit or push was performed. UI/MCP were
+  unchanged and their checks were not rerun.
+- **Trace follow-up:** the user subsequently supplied an introspection failure
+  for `CoinUploadConfiguration`, still without the deepest cause. A fresh
+  reflection probe of its bean method succeeds with Eclipse's recorded
+  dependencies and the current workspace output. The pasted `main:10` frame
+  differs from the rebuilt application's `main:26`; it is not a trace of that
+  rebuilt class. No further application code changes or suite reruns were needed.

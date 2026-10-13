@@ -274,6 +274,14 @@ REST datasource and closes without closing its pool. Repository SQL/module
 ownership is unchanged. Per-process admission is bounded to one web import;
 existing DB locks/identity/period constraints protect retries and other processes.
 
+**Startup correction, 9 October:** Eclipse m2e was observed resolving the Coin
+classifier to the entire batch workspace output. REST now explicitly excludes
+standalone batch launchers, legacy services and batch/Coin packages from component
+scanning while preserving the upload bridge and Boot's default filters. Packaging
+isolation alone does not protect workspace launches. See the
+[component explanation](project-understanding/COMPONENTS.md#coin-upload-bridge--9-october-2026)
+and [startup verification](project-understanding/VERIFICATION.md#rest-workspace-startup-isolation--9-october-2026).
+
 Tests include actual authenticated multipart HTTP against a temporary server and
 disposable PostgreSQL, CSRF, ownership, completion/replay, safe errors and failure
 restart. See [Verification](project-understanding/VERIFICATION.md#coin-upload-integration--9-october-2026)

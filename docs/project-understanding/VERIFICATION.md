@@ -454,3 +454,59 @@ No live migration, import, service restart, deployment, commit or push occurred.
 V14 and the preflight prerequisites must be reconciled/applied through deployment
 before live uploads can import. Fresh V1–V14 installation, actual broker exports
 against deployed master data and ungraceful-kill recovery remain unverified.
+
+## REST workspace startup isolation — 9 October 2026
+
+Baseline: `feature/coin-batch-zerodha-upload`,
+`4f2dc67b4a5cbb42461b5d79756194f3cb04cbf2`; checkout initially clean.
+Changes are limited to REST component-scan exclusions, startup regression tests
+and project-understanding documentation.
+
+- **R/C:** Eclipse's persisted `trade-rest` Maven classpath container maps
+  `trade-batch:coin-library` to `/trade-batch`, while the packaged REST JAR contains
+  the filtered Coin library. The installed and packaged Coin libraries both
+  contain `CoinImportRuntime`; a missing class was not established from the
+  supplied log fragment.
+- **T, before fix:** scanning the real workspace batch output registers both
+  legacy launchers/services/jobs plus the standalone Coin launcher and imported
+  Coin job. A mock servlet application context fails with a duplicate
+  `taskExecutor` bean from legacy/Coin configuration. No runners or application
+  databases are used by this reproduction.
+- **C:** [TradeRestApplication](../../trade-rest/src/main/java/com/trading/TradeRestApplication.java)
+  excludes those scan candidates by name/package, preserving Boot's
+  `TypeExcludeFilter` and `AutoConfigurationExcludeFilter`. Coin uploads still
+  use [CoinUploadConfiguration](../../trade-rest/src/main/java/com/trading/upload/CoinUploadConfiguration.java)
+  and the explicitly registered private runtime context.
+- **T, after fix:** a configuration-only probe using Eclipse's recorded library
+  dependencies and all four workspace class directories registers the REST app
+  and Coin upload bridge without batch jobs or standalone launchers.
+- Regression source:
+  [RestWorkspaceStartupTest](../../trade-rest/src/test/java/com/trading/startup/RestWorkspaceStartupTest.java)
+  exercises the actual batch workspace classes, both scan isolation and mock
+  servlet startup with an isolated H2 datasource. Its context runner explicitly
+  supplies upload paths and Boot's mutable application conversion service,
+  normally installed by `SpringApplication`.
+- **T, final verification:** `mvn -o verify -pl trade-rest -am` passed at
+  10:28 IST: **272 tests (47 batch + 225 REST), zero failures/errors/skips**,
+  including both workspace startup tests and real HTTP/Coin/PostgreSQL tests.
+  REST and batch packaging passed; the packaged REST application class exactly
+  matches the compiled workspace class, and REST still contains only the Coin
+  library plus Batch core/infrastructure. No JaCoCo class mismatch was reported.
+  UI/MCP were unchanged and not included in this scoped verification.
+- The initial sandbox build could not access Docker; the final approved run used
+  disposable PostgreSQL outside the sandbox. Earlier test-development failures
+  were corrected before the final passing build. Logs:
+  `/tmp/trade-rest-workspace-before.log`, `/tmp/trade-rest-workspace-after.log`,
+  `/tmp/trade-rest-startup-final-verify.log`.
+
+The subsequently supplied trace narrows the original PropertyPlaceholder condition
+failure to introspection of `CoinUploadConfiguration`; its next/deepest `Caused by`
+remains unavailable. Its bean method returns `CoinImportRuntime`. A fresh Java
+reflection probe using Eclipse's recorded dependencies and current workspace
+classes successfully inspected that method without creating beans or connecting
+to a database. The supplied trace reports `TradeRestApplication.main` at line10;
+the current compiled method maps its SpringApplication call to line26, so the
+trace does not represent the rebuilt class. The reproduced workspace collision
+is a confirmed defect, but is not proof of the exact underlying exception in the
+original launch. No live application database was queried/migrated, no legacy
+runner was executed, and no user service was restarted.

@@ -1,6 +1,13 @@
 package com.trading.coin;
 
 import java.util.*;
+
+import com.trading.coin.batch.config.CoinBatchConfiguration;
+import com.trading.coin.batch.reader.CoinCsvReader;
+import com.trading.coin.batch.validator.CoinRecordValidator;
+import com.trading.coin.service.CoinCommandLine;
+import com.trading.coin.service.CoinFileStore;
+import com.trading.coin.service.CoinImportService;
 import com.trading.model.coin.*;
 import com.trading.repository.CoinImportRepository;
 import org.springframework.batch.core.job.Job;

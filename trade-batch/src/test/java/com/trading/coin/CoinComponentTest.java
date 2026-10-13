@@ -3,6 +3,10 @@ package com.trading.coin;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.*;
+
+import com.trading.coin.batch.reader.CoinItemReader;
+import com.trading.coin.service.CoinCommandLine;
+import com.trading.coin.service.CoinFileStore;
 import com.trading.model.coin.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -68,7 +72,7 @@ class CoinComponentTest {
         var projection = new CoinItemReader("projection", rows); projection.open(context); assertEquals(1, projection.read().number());
     }
     @Test void legacyApplicationConfigurationDoesNotDiscoverCoinBeans() {
-        for (Class<?> application : List.of(com.trading.TradeBatchApplication.class, com.trading.LedgerBalancesBatchApplication.class)) {
+        for (Class<?> application : List.of(com.trading.kite.TradeBatchApplication.class, com.trading.kite.LedgerBalancesBatchApplication.class)) {
             try (var context = new org.springframework.context.annotation.AnnotationConfigApplicationContext()) {
                 context.register(application);
                 // Resolve the actual scan/import graph without instantiating or executing legacy runners.

@@ -136,6 +136,14 @@ GlobalExceptionHandler preserves structured per-record field errors and HTTP sta
 `trade-rest/pom.xml` consumes `trade-batch:coin-library` and Batch core only;
 `trade-batch/pom.xml` attaches that limited ordinary JAR at process-classes. This
 is the narrow module dependency required by the user's endpoint integration.
+For IDE launches, [TradeRestApplication](../../trade-rest/src/main/java/com/trading/TradeRestApplication.java)
+also excludes the batch/Coin packages, standalone batch launchers and legacy batch
+services from component scanning, while retaining Boot's default scan filters.
+The 9 October startup investigation observed Eclipse m2e resolving `coin-library`
+to the entire batch workspace project, bypassing the classifier's content filter.
+Without these exclusions, the REST scan registers legacy jobs and imports the
+standalone Coin configuration, causing conflicting infrastructure beans.
+The upload bridge remains available; it explicitly creates the private Coin context.
 [CoinUploadPostgresIntegrationTest](../../trade-rest/src/test/java/com/trading/upload/CoinUploadPostgresIntegrationTest.java)
 verifies REST has no root Job/JobRepository beans, that the pool stays open, and
 that only the Coin job writes through real HTTP and PostgreSQL paths.

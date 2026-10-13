@@ -7,7 +7,8 @@ import java.util.Locale;
 import java.util.UUID;
 import java.util.List;
 import java.util.concurrent.Semaphore;
-import com.trading.coin.CoinImportRuntime;
+
+import com.trading.coin.service.CoinImportRuntime;
 import com.trading.model.coin.CoinValidationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.util.unit.DataSize;
@@ -61,7 +62,7 @@ public class ZerodhaTransactionUploadService {
             throw failure(HttpStatus.CONFLICT, "This Coin import is already running.");
         } catch (IllegalArgumentException e) {
             if ("SCHEMA_PREFLIGHT_FAILED".equals(e.getMessage()))
-                throw failure(HttpStatus.SERVICE_UNAVAILABLE, "Coin import database prerequisites are not ready.");
+                throw failure(HttpStatus.SERVICE_UNAVAILABLE, "Coin import database prerequisites are not ready." + e.getMessage());
             if ("IMPORT_CONTRACT_CHANGED".equals(e.getMessage()))
                 throw failure(HttpStatus.CONFLICT, "This file was previously imported with different options. Reuse its original options.");
             throw failure(HttpStatus.BAD_REQUEST, "Invalid Coin upload options, file, or owned account.");
