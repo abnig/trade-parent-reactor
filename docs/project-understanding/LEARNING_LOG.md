@@ -1,325 +1,124 @@
 # Project learning log
 
-Use this log for material discoveries and decisions from work on this application.
-Maintain the corresponding sections of [Project understanding](../PROJECT_UNDERSTANDING.md)
-and its appendices so future sessions can find the current explanation directly.
-The retention procedure is in [AGENTS.md](../../AGENTS.md#retaining-project-knowledge).
+Record material decisions and findings with date, checkout, evidence and unresolved
+gaps. Correct the canonical topic reference as well as adding an entry. Follow
+[AGENTS.md](../../AGENTS.md#retaining-project-knowledge); never retain credentials or
+private records. Entries below summarize history; detailed prior versions remain in
+Git. Current behavior is indexed by [Project understanding](../PROJECT_UNDERSTANDING.md).
 
-Each new entry should include its date, branch/commit and relevant local changes;
-the discovery or user decision; links to source symbols or report sections;
-verification performed and its limits; and any unresolved follow-up. Use the
-report's code/test/runtime/inferred/unresolved evidence labels for technical claims.
-Do not copy credentials, tokens, private records or personal financial data here.
+## 2026-10-07 — Investigation and retention request
 
-## 2026-10-07 — Investigation handoff and standing retention request
+Baseline `main` at `70b9f2c`; documentation and AGENTS changes only. The user asked
+that learning be retained every time the app is worked on. The investigation mapped
+modules, SQL, APIs, UI, workflows and runtime configuration. Dated test and catalog
+evidence is preserved in [Verification](VERIFICATION.md) and [Data model](DATA_MODEL.md).
+No application or database change was made.
 
-- **Baseline:** `main`, commit `70b9f2c2e8621ed396019c6378c1a61b019cf701`.
-  The investigation added `docs/`; this follow-up also updates `AGENTS.md`.
-  Application code and configuration remain unchanged.
-- **User decision:** retain learning every time we work on this app. Future tasks
-  must consult the report, correct affected descriptions, and record material new
-  learning, decisions, verification and unresolved gaps before finishing.
-- **Handoff:** the [report](../PROJECT_UNDERSTANDING.md) and its appendices retain
-  the completed module, data model, backend, UI, workflow, batch, MCP and deployment
-  investigation. [Verification](VERIFICATION.md) records the dated checks and
-  infrastructure limitations; those results are historical, not a new test run.
-- **Scope of this follow-up:** documentation and persistent memory only; no
-  application, dependency, database, migration, deployment or service changes.
+## 2026-10-07 — Coin analysis and catalog refresh
 
+At `70b9f2c` plus pending documentation, the user requested a reusable analysis
+prompt and batch requirements, not an implementation. The 16-field sample exposed
+unquoted JSON-shaped tags and an ambiguous date convention; private values were
+not retained. Proposed staging, matching, posting and identity defaults were not
+approvals. Read-only catalogs showed V10/V11/V13-era layout, missing V12 uniqueness
+and baseline-1-only history. Offline dependency inspection found Batch 6.0.3 and
+JDBC 7.0.7, with a resourceless default requiring explicit JDBC restart infrastructure.
+No tests/import/migration ran for this analysis. Current [mapping](../../coin-order-schema.md)
+and [requirements](../COIN_ORDER_HISTORY_BATCH_REQUIREMENTS.md) supersede the long proposal.
 
-## 2026-10-07 — Coin CSV field mapping and batch requirement specification
+## 2026-10-08 — Handoff and period-tracking requirement
 
-- **Baseline:** main, commit `70b9f2c2e8621ed396019c6378c1a61b019cf701`;
-  pre-existing modified AGENTS.md and untracked docs preserved.
-- **User request:** create a reusable field-mapping prompt and a Markdown
-  requirement specification for a future import in trade-batch. This request
-  does not authorize implementing or running that importer.
-- **Deliverables:** [prompt](../COIN_ORDER_HISTORY_ANALYSIS_PROMPT.md) and
-  [proposed specification](../COIN_ORDER_HISTORY_BATCH_REQUIREMENTS.md).
-- **C:** current migrations, models and JDBC confirm the V11 pending-order
-  metadata storage gap and status-independent transaction portfolio inclusion.
-  The spec requires complete source preservation and separates ingestion from
-  financial posting. It proposes staging, owner-scoped matching, replay/overlap
-  handling, runner isolation and acceptance tests.
-- **U:** lifecycle/posting dates, stable source order identity, master creation,
-  deferred-row resolution, schema deployment and upload integration remain
-  explicit decisions. Proposed defaults are not user approvals.
-- **Verification:** read-only CSV/source analysis and documentation checks;
-  no database access, migrations, application tests, batch runs or service
-  changes. Prior runtime/test results were not reclassified as current evidence.
-- No source account/order identifiers or personal financial records are retained
-  in this learning entry.
+Baseline remained `70b9f2c` plus documentation. Source review identified the need to
+isolate Coin from legacy scanning in both directions; a packaged-main choice alone
+was insufficient. The user then requested user/fund date tracking to prevent repeat
+period loads. Any-overlap rejection and explicit bounds were proposed defaults,
+not recorded approvals. This decision was later superseded by the 13 October
+request to remove row/period tracking. No database change accompanied the proposal.
 
-## 2026-10-07 — Coin specification refreshed against CSV, catalogs and Batch APIs
+## 2026-10-08 — Original Coin implementation
 
-- **Baseline:** main at `70b9f2c2e8621ed396019c6378c1a61b019cf701`;
-  pre-existing modified AGENTS.md and untracked docs preserved. Documentation only.
-- **Deliverable:** updated [requirements](../COIN_ORDER_HISTORY_BATCH_REQUIREMENTS.md)
-  with full field profiles/mapping, concrete two-table audit proposal, exact
-  ownership/lifecycle/overlap policies, batch infrastructure/runbook and tests.
-  Earlier defaults remain proposals; no importer or database import approved.
-- **CSV:** 16 expected headers/9 rows; unquoted JSON-shaped tags with literal
-  quotes, no doubled CSV escapes/quoted commas/multiline records observed.
-  Date convention cannot be proven from this sample. Private values were not
-  retained; the spec records aggregate profiles and checksum only.
-- **R:** fresh read-only catalog check in both configured databases confirms
-  V10/V11/V13 layout and same-fund FK; V12 uniqueness absent and baseline1-only
-  history. No business records, private-data counts or sequence values queried.
-- **C:** dependency:tree resolved Batch6.0.3/JDBC7.0.7. Batch6's default
-  EnableBatchProcessing is resourceless; explicit JDBC infrastructure is required
-  for proposed durable Coin restart. Current runner wiring remains unexecuted.
-- **P/U:** business file identity excludes parser version; identical row content
-  cannot alone prove duplicate orders. Missing folios/date convention, source
-  identity, posting/reversals and audited resolution remain policy decisions.
-- **Verification:** read-only CSV/source/catalog/library analysis and document
-  coverage/link/whitespace checks; no application tests/build/startup, migrations,
-  records imported, services/deployments, commits or pushes.
+At `70b9f2c` plus uncommitted work, the user requested the job, all-record validation,
+component tests and PROCESSING-to-COMPLETE upserts. The original implementation
+added V14, owner matching, source preservation, period reservations and explicit
+posting/restart policies. Disposable-PostgreSQL and new-JVM checks passed; shared
+class-output rewriting required an isolated source-identical verification copy.
+See [historical results](VERIFICATION.md#historical-results). Live migration/master
+matching and abrupt-kill recovery remained unverified. This importer was later removed.
 
-## 2026-10-08 — Coin requirements handoff completed
+## 2026-10-09 — Upload integration and publication
 
-- **Baseline:** `main`, commit `70b9f2c2e8621ed396019c6378c1a61b019cf701`;
-  pre-existing modified `AGENTS.md` and untracked `docs/` preserved.
-- **Scope recovered:** the previous request was analysis/documentation only.
-  Resume completes the [requirements](../COIN_ORDER_HISTORY_BATCH_REQUIREMENTS.md)
-  handoff; it does not approve its proposed business policies or implementation.
-- **C/I:** [TradeBatchApplication](../../trade-batch/src/main/java/com/trading/TradeBatchApplication.java)
-  and [LedgerBalancesBatchApplication](../../trade-batch/src/main/java/com/trading/LedgerBalancesBatchApplication.java)
-  both use default component scanning from `com.trading`. New annotated Coin
-  components could therefore enter legacy contexts. Narrowing only the proposed
-  Coin scan or selecting its packaged main is insufficient. Requirements and
-  planned tests now cover isolation in both directions; this consequence is
-  inferred from source, not runtime-verified.
-- **Verification:** source SHA-256 still matches the specification; checked all
-  16 profile/mapping rows, FR-01–20 and local links; re-read affected migrations,
-  JDBC storage/portfolio queries, upload staging and runner source. Documentation
-  checks only; no build/application tests, DB connection, migration, import or
-  service operation. Prior catalog/test results retain their original dates.
-- **U:** posting/date/identity/master-resolution policy and launcher architecture
-  remain review decisions in section 10. No application code changed.
+At `70b9f2c` plus the existing Coin work, the user requested REST/UI integration.
+The then-implemented route returned 200 on completed options-based imports and 202
+for file-only staging. A private context borrowed REST's datasource; a Coin-only
+classifier and Batch core avoided legacy runners/Boot Batch auto-configuration.
+Real HTTP/PostgreSQL, backend and UI checks passed with their documented limits.
+The user subsequently authorized branch creation, commit and push to
+`feature/coin-batch-zerodha-upload`. No live migration/deployment occurred.
+The upload implementation is absent from the current checkpoint.
 
-## 2026-10-08 — User and mutual-fund import-period tracking
+## 2026-10-09 — IDE workspace startup isolation
 
-- **Baseline:** `main` at `70b9f2c2e8621ed396019c6378c1a61b019cf701`;
-  pre-existing modified `AGENTS.md` and untracked `docs/` preserved.
-- **User decision:** require a date-tracking table at user and mutual-fund level
-  to prevent another file loading the same period. Added the
-  [period table/contract](../COIN_ORDER_HISTORY_BATCH_REQUIREMENTS.md#user-and-mutual-fund-period-tracking),
-  FR-21–23, job parameters, reservation/recovery rules and planned tests; updated
-  the reusable prompt, report, data-model and workflow appendices.
-- **P/U:** any-overlap rejection and explicitly supplied export bounds are
-  proposed defaults; clarification requested, not recorded as user approval.
-  Multiple funds reserve atomically before staging; failed/partial imports retain
-  coverage and resume using the same claim. This changes the proposed treatment
-  of overlapping files and unresolvable fund/date coverage; corrected same-period
-  exports need audited reconciliation.
-- **C:** current fund ownership/parent updates were checked in
-  [OwnedFundRepository](../../trade-repository/src/main/java/com/trading/repository/impl/OwnedFundRepository.java).
-  V1 does not declare btree_gist; its installation is a future prerequisite of
-  the proposed GiST exclusion constraint. Official PostgreSQL documentation was
-  reviewed; neither current extension availability nor the constraint was tested.
-- **Verification scope:** documentation field/requirement/link consistency and
-  source inspection only. No application code/migration created, DB connection,
-  import, service start or application test. Retained historical checks keep their
-  original date/scope; the new table is specified, not live.
+Baseline `4f2dc67` on the feature branch. Eclipse resolved the Coin classifier to
+full batch workspace output, reproducing a conflicting infrastructure-bean startup
+failure. Explicit REST scan exclusions and workspace tests fixed that collision.
+The original supplied trace omitted its deepest cause; a later successful reflection
+probe did not establish the exact original exception or live Eclipse startup.
+[Current startup boundary](COMPONENTS.md#build-repair-and-current-workspace--16-november-2026)
+and [historical verification](VERIFICATION.md#historical-results) retain the result.
 
+## 2026-10-13 — Remove row/period tracking and add CoinRecord
 
-## 2026-10-08 — Coin implementation completed and PostgreSQL/runtime tests added
+Baseline `08099d7` with existing upload-size changes. The user requested removing
+`coin_import_file_fund`, `coin_import_period` and `coin_import_row`. V15 preserved
+identity snapshots/counters, rejected noncontiguous progress, then dropped the
+three tables. The then-existing direct-projection importer accepted overlaps while
+retaining identity/replay/lifecycle behavior; tests passed only for that historical
+implementation. V14 remained immutable; no live migration was applied.
 
-- **Baseline:** `main`, `70b9f2c2e8621ed396019c6378c1a61b019cf701`. Resumed existing
-  uncommitted Coin source/model/repository/V14/POM/launcher changes and preserved
-  pre-existing AGENTS.md/docs. No commit or push.
-- **Recovered user decision:** implement the Spring Batch job, test its components,
-  validate all input records and upsert PROCESSING to COMPLETE. This supersedes
-  the earlier documentation-only scope and blanket same-period correction block.
-  The [runbook](../COIN_BATCH_RUNBOOK.md) is the current contract; original source
-  analysis remains in the [requirements](../COIN_ORDER_HISTORY_BATCH_REQUIREMENTS.md).
-- **C/T:** isolated Coin launcher, explicit JDBC Batch infrastructure, immutable
-  source staging, owner/account/fund checks, five V14 audit/identity/period tables,
-  atomic reservations, completion upserts and optional explicit-date transaction
-  posting. Exact replay is a no-op; failed coverage persists; restart in a new JVM
-  resumes committed chunks. Known unchanged funds can accompany another fund's
-  completion. Date convention/posting policy are explicit parameters, not inferred
-  approvals. No automatic masters or manual-record association.
-- **Fixes:** Batch6 exposes a proxied JobOperator, so concrete-class lookup failed;
-  corrected it. Added all-files DB preflight, read-only dry run and sanitized writer
-  failures because PostgreSQL errors can include raw rows. Updated
-  [components](COMPONENTS.md#coin-components--8-october-2026),
-  [workflow](WORKFLOWS.md#coin-import-workflow--implemented-8-october-2026) and
-  [data model](DATA_MODEL.md#coin-v14-implementation--8-october-2026).
-- **T:** clean full reactor passed **258 tests, zero failures/errors/skips**.
-  Coin adds47 (17 PostgreSQL integration cases plus30 parser/validator/component
-  cases). Verified V14 upgrade, database overlap error/adjacent periods, concurrent
-  claims, ownership, source fidelity, lifecycle/posting, failure rollback, fresh-JVM
-  restart, standalone dry run/import, legacy scan exclusion and packaged validation.
-- **Build finding:** target class files changed after packaging in the shared
-  checkout; background compilation is inferred, process unconfirmed. Final
-  source-hash-matched isolated Coin verification passed47 tests without class-data
-  mismatch warnings. Shared aggregate coverage has that limitation; no coverage
-  percentage is claimed. Exact commands/evidence in [Verification](VERIFICATION.md#coin-batch-implementation--8-october-2026).
-- **U/boundary:** V14 written/tested only in disposable PostgreSQL; application DBs
-  were not accessed or migrated. Dated missing V12/live history reconciliation
-  remains deployment work. Upload endpoint still only stages files. No frontend
-  change, live import, service start/restart/deployment or private records in notes.
+The user also requested a 16-field POJO; the original addition in `trade-model`
+compiled independently while surrounding deletions/rewrite work remained unfinished.
+The current class now resides in the batch inbound package. The preserved 1000 MB
+upload fallback exceeds the service's 100 MiB guard if the normal 10 MB property
+is absent. See [Coin status](../COIN_BATCH_RUNBOOK.md) and [Data model](DATA_MODEL.md).
 
-## 2026-10-09 — Connect the Coin job to Zerodha uploads
+## 2026-11-16 — Publish rewrite checkpoint and repository repairs
 
-- **Baseline/user request:** `main` at `70b9f2c2e8621ed396019c6378c1a61b019cf701`,
-  existing uncommitted Coin implementation and AGENTS.md/docs preserved. User
-  requested integrating the newly created job with `/zerodha-upload` and resuming
-  the work; no commit, deployment or live migration was requested/performed.
-- **C/T contract:** `POST /api/mutual-fund-txns/zerodha-upload` with multipart file
-  plus JSON options runs the job synchronously and returns200 only on completion.
-  Session ownership is authoritative. File-only requests retain202 staging.
-  Explicit account/period/date/posting/matching choices are collected in the UI;
-  safe record errors and persisted import counts are returned. Identical replay
-  returns the original import result, without duplicate writes. See the
-  [runbook](../COIN_BATCH_RUNBOOK.md#rest-and-ui-integration--9-october-2026) and
-  [contracts](CONTRACTS_AND_UI.md#coin-upload-contract--9-october-2026).
-- **C/T integration isolation:** the required REST→batch dependency is a small
-  `coin-library` classifier attached at process-classes; it excludes standalone
-  mains/legacy runners. REST includes Batch core without Boot Batch auto-config.
-  [CoinImportRuntime](../../trade-batch/src/main/java/com/trading/coin/CoinImportRuntime.java)
-  explicitly creates/closes a private context and registers the borrowed pool as
-  a singleton so closing it does not close REST's datasource. Coin configuration
-  is explicitly registered/imported, no longer component-scanned. Persistence
-  stays in `trade-repository`; no new schema changes were needed.
-- **C/T operational behavior:** bounded file reads and one web import per process;
-  existing database identity/period locks protect CLI and other processes. HTTP
-  timeouts do not imply rollback; retry identical bytes/options. Import errors
-  retain safe codes without SQL/source exception causes. Failed chunks can leave
-  earlier committed work, so the UI refreshes totals after attempts and the error
-  explains same-file restart.
-- **Fixes:** Batch6 running-execution exception is in `core.launch`; Spring7
-  multipart tests use `AbstractMockHttpServletRequestBuilder`. The final build
-  used an isolated source copy to avoid the previously demonstrated workspace
-  class rewriting; all197 manifest entries matched workspace hashes afterward.
-- **T:** full clean backend **270/270**, focused upload/controller **36/36**, UI
-  **119/119**, Vite build passed. Real HTTP upload against disposable PostgreSQL
-  persisted the order; tests cover CSRF/ownership, source fidelity, lifecycle,
-  replay/conflicts, validation, partial failure/restart and pool/context isolation.
-  Packaging retained both executable entry points. Details and limitations are
-  in [Verification](VERIFICATION.md#coin-upload-integration--9-october-2026).
-- **U/boundary:** no live DB/runtime verification or migration; V12/history/V14
-  readiness is still a deployment prerequisite. UI browser interaction/layout,
-  fresh schema installation and ungraceful-kill recovery remain unverified.
+Baseline `08099d7` plus Coin/model/repository/REST changes, V15, tests and docs.
+The user explicitly authorized staging, committing and pushing, excluding every
+`target` directory. `719606a` was pushed to the existing feature branch; its tree
+contains no `target` paths. Fresh Maven verification passed 206 tests after a
+sandbox-restricted attempt was rerun with required access. No application behavior
+was changed during publication. Source whitespace warnings were preserved.
 
-## 2026-10-09 — Prepare the feature branch for publication
+The checkpoint restores REST owner-scoped beans/pagination and covers owner/ISIN
+lookup regressions on H2 and PostgreSQL. Coin upload/job persistence remains
+unfinished; historical import results cannot validate it. See [Components](COMPONENTS.md)
+and [Verification](VERIFICATION.md#build-failure-repair--16-november-2026).
 
-- **User decision:** explicitly requested a new feature branch containing the
-  current changes, followed by a commit and push to the existing remote.
-- **Git scope:** created `feature/coin-batch-zerodha-upload` from `main` at
-  `70b9f2c2e8621ed396019c6378c1a61b019cf701`. The commit includes the Coin batch,
-  V14 migration, REST/UI integration, tests, project-understanding documentation
-  and existing AGENTS.md retention instructions. Remote is `origin` for the same
-  repository; no history rewrite or application deployment is part of this request.
-- **Verification:** backend source/POM hashes still match the isolated successful
-  build documented in [Verification](VERIFICATION.md#coin-upload-integration--9-october-2026).
-  No application source changed during branch preparation, so tests were not
-  rerun. The preceding results remain270 backend tests,119 UI tests and a passing
-  UI build, with their documented scope and limitations. This entry records
-  publication authorization and preparation; the Git commit/remote refs provide
-  the resulting publication evidence.
+## 2026-11-16 — Reconcile and shorten Markdown
 
-## 2026-10-09 — Isolate REST startup from Eclipse's full batch workspace output
+Started clean at `719606a` on `feature/coin-batch-zerodha-upload`. The user requested
+reconciling Markdown with current code and removing repetition. Each topic now has
+a primary reference, superseded launch/receipt claims are removed, and historical
+test/schema evidence keeps its dates and scope. Contributor instructions and JSON
+evidence snapshots were preserved.
 
-- **Baseline/trigger:** clean `feature/coin-batch-zerodha-upload` at
-  `4f2dc67b4a5cbb42461b5d79756194f3cb04cbf2`. User supplied an early REST startup
-  condition failure; the deepest `Caused by` was not included.
-- **R/C finding:** Eclipse m2e's persisted classpath resolves `coin-library` to
-  the entire `trade-batch` workspace project, despite the filtered packaged JAR.
-  A scan of that output discovers both legacy launchers/jobs and the standalone
-  Coin launcher, which imports private Coin configuration into REST.
-- **T reproduction/fix:** the pre-fix workspace context fails on conflicting
-  `taskExecutor` beans. [TradeRestApplication](../../trade-rest/src/main/java/com/trading/TradeRestApplication.java)
-  now explicitly excludes batch/Coin packages, standalone launchers and legacy
-  batch services, while preserving Boot's default filters and the upload bridge.
-  [RestWorkspaceStartupTest](../../trade-rest/src/test/java/com/trading/startup/RestWorkspaceStartupTest.java)
-  uses the actual full batch output to verify both scan isolation and web context
-  startup without root jobs/runners. No dependency/module/contract changes.
-- **T verification:** `mvn -o verify -pl trade-rest -am` passed **272 tests
-  (47 batch + 225 REST)**, zero failures/errors/skips, plus packaging. Real
-  HTTP/PostgreSQL upload regression still passes. The packaged REST application
-  class matches workspace output. Details and logs are in
-  [Verification](VERIFICATION.md#rest-workspace-startup-isolation--9-october-2026);
-  [components](COMPONENTS.md#coin-upload-bridge--9-october-2026) and the main
-  report now describe the additional workspace startup boundary.
-- **U/scope:** the reproduced collision is confirmed, but cannot be equated to
-  the exact original exception without its omitted cause. Live Eclipse startup
-  was not rerun. No application DB access/migration, legacy runner execution,
-  deployment, user-service restart, commit or push was performed. UI/MCP were
-  unchanged and their checks were not rerun.
-- **Trace follow-up:** the user subsequently supplied an introspection failure
-  for `CoinUploadConfiguration`, still without the deepest cause. A fresh
-  reflection probe of its bean method succeeds with Eclipse's recorded
-  dependencies and the current workspace output. The pasted `main:10` frame
-  differs from the rebuilt application's `main:26`; it is not a trace of that
-  rebuilt class. No further application code changes or suite reruns were needed.
+**C:** confirmed Coin has no launcher main/job/step, mapper is empty and writers only
+print; the draft processor has missing parent-ID and unmatched-account handling.
+Legacy sources now live under `com.trading.kite`. Broker `ownerUserId` is a bean
+property but its owned row mapper leaves it null; SQL still enforces principal
+ownership. `api.js` preserves field errors. Production UI health gating occurs only
+before first listen. Canonical references: [Coin status](../COIN_BATCH_RUNBOOK.md),
+[Contracts](CONTRACTS_AND_UI.md), [Batch](../../trade-batch/ARCHITECTURE.md),
+[Deployment](../../DEPLOYMENT_ARCHITECTURE.md).
 
-## 2026-10-13 — Remove Coin row staging and period tracking
+Documentation paths/anchors, stale references and whitespace were checked. No
+application test rerun, code/configuration change, database access, deployment,
+commit or push forms part of this documentation task. Existing 206-test evidence
+remains separately dated in [Verification](VERIFICATION.md).
 
-- **Baseline/user decision:** `feature/coin-batch-zerodha-upload` at
-  `08099d70b58e859c9f552d2950989a3df37cf3c4`. User requested removing code for
-  `coin_import_file_fund`, `coin_import_period`, and `coin_import_row`, with all
-  tests passing. Preserved the existing uncommitted upload fallback-size change.
-- **C behavior:** `CoinBatchConfiguration` now runs project/finalize only;
-  `CoinStageWriter` and the repository staging API are removed.
-  `JdbcCoinImportRepository.prepare/project` no longer reserves or rejects fund
-  periods. Date bounds still validate input and form part of the replay contract.
-  `coin_order_identity.source_fields` retains the latest 16 decoded cells;
-  file counters and sequential progress commit atomically with domain writes.
-  Complete byte history remains in managed source files. Ownership, exact replay,
-  lifecycle conflict detection, explicit posting and new-JVM restart remain.
-- **C schema:** immutable V14 retained; [V15](../../trade-repository/src/main/resources/db/migration/V15__remove_coin_row_and_period_tracking.sql)
-  backfills identity snapshots and import counts, rejects noncontiguous legacy
-  progress, then removes the three tables and the old identity row reference.
-  No live migration was run. Old import workers must stop before deployment.
-- **C fixes discovered by regression:** REST was depending on the executable
-  batch JAR, hiding `CoinImportRuntime` under BOOT-INF at verify/package time.
-  `trade-rest/pom.xml` now selects the existing Coin library classifier and Batch
-  core, excluding Boot Batch auto-configuration. Removed an unconditional `true`
-  override of schema preflight and restored the tested public schema-error message.
-- **T final:** clean full reactor **274/274**, frontend **119/119**, Vite build
-  and `git diff --check` passed; zero test failures/errors/skips. See
-  [current verification](VERIFICATION.md#coin-table-removal--13-october-2026)
-  for executed results, migration rollback, HTTP import, replay and restart evidence.
-  Initial Docker/sandbox failures were followed by authorized runs after Docker
-  startup. No application DB access, deployment, restart, commit or push occurred.
-- **U retained limitation:** the user's `1000MB` fallback exceeds the service's
-  existing 100 MiB guard when the property is absent. The application explicitly
-  sets `spring.servlet.multipart.max-file-size=10MB`; the standalone startup test
-  now supplies that same value. This task does not change upload-size policy.
-
-## 2026-10-13 — Add CoinRecord for the upcoming job rewrite
-
-- **User request:** create a POJO for the 16 named Coin CSV fields. Added
-  [CoinRecord](../../trade-model/src/main/java/com/trading/model/coin/CoinRecord.java)
-  in `trade-model`, with camelCase properties, public no-argument constructor
-  and getters/setters. Exact decimals use `BigDecimal`, date/time use
-  `LocalDate`/`LocalTime`; source IDs and labels remain strings.
-- **Scope:** baseline remains `08099d70b58e859c9f552d2950989a3df37cf3c4` on
-  `feature/coin-batch-zerodha-upload`. Existing table-removal work and newer
-  externally made Coin class deletions/edits were preserved. No job wiring,
-  persistence mapping, database change or completion of the pending rewrite is
-  implied by this POJO addition.
-- **Verification:** `mvn -o verify -pl trade-model -am` compiled and packaged the
-  model successfully. This module has no tests; getter/setter-only behavior did
-  not warrant additional test dependencies. No full-reactor result is claimed
-  for the newer surrounding workspace changes.
-
-## 2026-11-16 — Publish the pending Coin rewrite and repository repairs
-
-- **Baseline/user decision:** `feature/coin-batch-zerodha-upload` at
-  `08099d70b58e859c9f552d2950989a3df37cf3c4`, with the existing Coin rewrite,
-  model/repository changes, V15, REST repairs, tests and documentation. The user
-  explicitly requested staging, committing and pushing, excluding all `target`
-  directories and their descendants. No application behavior was changed during
-  this publication task.
-- **T:** fresh `mvn -o verify -Pdev` passed **206 tests**, zero failures/errors/skips,
-  and all seven reactor projects after rerunning outside sandbox restrictions on
-  Docker and Mockito. See [verification](VERIFICATION.md#build-failure-repair--16-november-2026).
-- **C/U:** no `target` files are tracked; existing ignore rules and explicit
-  staging exclusions keep generated output out of the commit. Existing whitespace
-  warnings were preserved. The Coin job/upload rewrite remains unfinished; see
-  [current component boundaries](COMPONENTS.md#build-repair-and-current-workspace--16-november-2026).
-  This is a checkpoint of the current work, not a completed import feature or
-  deployment. The Git commit and remote refs provide publication evidence.
+Publication follow-up: the user subsequently authorized staging, committing and
+pushing these 19 Markdown changes from `719606a` to the existing feature branch,
+excluding every `target` directory. Documentation checks were rerun; application
+suites were not rerun for this documentation-only commit. Git refs record the
+publication result.

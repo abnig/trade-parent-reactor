@@ -1,81 +1,49 @@
 # Flyway migrations
 
-This directory is packaged with the shared `trade-repository` module and is
-therefore available at the standard Flyway classpath location
-`classpath:db/migration` to the REST application that owns schema migration
-startup.
+Source baseline: `719606a`, 16 November 2026. This shared module packages **V1–V15**
+under `classpath:db/migration`. [Data model](../../../../../../docs/project-understanding/DATA_MODEL.md)
+owns the migration ledger, column dictionary and dated catalog evidence.
 
-Use one immutable SQL migration per schema change:
+## Current startup behavior
 
-```text
-V<version>__<description>.sql
-```
+Flyway is disabled in REST, batch and MCP application configuration. Hibernate DDL
+is `none`; batch/MCP SQL and Batch schema initialization are disabled. REST's
+configured baseline version is **1**, not 4. The `flyway-baseline` profile enables
+baseline-on-migrate but does not itself enable Flyway or select a different version.
 
-The current schema is represented by V1 through V4. Existing databases are
-baselined at version 4 only after their schema has been verified. `V5__create_app_user.sql` adds the registration tables and seeds `ROLE_USER`.
-Existing authentication tables must match the V5 definitions.
+A table's presence does not prove that its migrations ran. The read-only 7 October
+snapshot found baseline-1-only histories, missing V12 broker uniqueness and other
+schema differences. That snapshot is historical and must be refreshed before
+choosing a migration strategy; it does not authorize applying scripts manually.
 
-Do not edit a migration after it has been applied to a shared database. Add a
-new migration to correct it, and never modify `flyway_schema_history` manually.
+## Upgrade rules
 
-`V6__portfolio_ownership.sql` adds broker-account ownership. Existing rows stay
-unassigned until explicitly mapped to verified users. While Flyway is disabled,
-apply V5 (if needed) and V6 manually before using login and private portfolios.
+- Keep applied migrations immutable. Add `V<version>__<description>.sql` for new
+  changes; do not rewrite checksums or `flyway_schema_history` to conceal drift.
+- Reconcile the actual schema/history and extension availability before enabling
+  migration. Test the chosen upgrade against a disposable representative database.
+- Resolve data conflicts explicitly, with affected writers stopped where needed;
+  migrations must not silently merge owners, funds, folios or financial facts.
 
-`V7__password_recovery.sql` adds recovery answers, challenges, reset tokens,
-rate-limit counters, and user credential/recovery versions. Apply it after V6
-and before starting REST with password-recovery support. Existing users retain
-their credentials but must enroll their own recovery answers. While Flyway is
-disabled, record manual application of V7 along with V5/V6. See
-[password reset setup](../../../../../../password-reset-backend.md).
+| Migration | Important precondition or effect |
+|---|---|
+| V1–V4 | Extensions, Batch/business and AI tables; fresh full installation remains unverified, including vector dimension/index compatibility |
+| V5–V6 | Authentication/ROLE_USER and nullable broker ownership; no automatic ownership backfill |
+| V7–V8 | Recovery state and separate profile hint; case-insensitive email duplicates block the V8 unique index |
+| V9 | Orders, optional fund metadata and six-place transaction units/NAV; no automatic transaction posting |
+| V10 | Moves folio to fund; conflicting distinct folios abort |
+| V11 | Moves five metadata fields to linked transactions; unlinked metadata/conflicts abort; no transaction invention |
+| V12 | Exact `(broker_name, account_id, owner_user_id)` uniqueness; NULL owners remain distinct; existing duplicates abort |
+| V13 | Optional ISIN becomes TEXT; `N/A` allowed; no source normalization |
+| V14 | Coin audit/identity/row/period schema, requires `btree_gist`; retained unchanged |
+| V15 | Backfills identity snapshots/file counters, rejects noncontiguous progress, drops `coin_import_row`, `coin_import_file_fund`, `coin_import_period` |
 
-`V8__user_profile_hint.sql` adds a separate, single profile hint and a
-case-insensitive unique email index. Check and resolve existing case-insensitive
-email duplicates before applying it. Apply the script atomically after V7; see
-[profile migration and API documentation](../../../../../../user-profile-management.md).
+V15 leaves `coin_import_file`, `coin_order_identity` and the earlier order table.
+Their Java import/order repositories have been removed in the current rewrite.
+Stop old import workers before any V15 upgrade; they require the retired tables.
+The migration does not drop `btree_gist` or prove the replacement importer works.
 
-`V9__mutual_fund_orders.sql` adds optional fund ISIN/plan, widens transaction
-units/NAV to six decimal places, and creates owner-linked mutual-fund order
-history separately from completed transactions. Apply after V8 before running
-the updated fund repositories. It performs no historical backfill. See
-[Coin order field mapping and persistence notes](../../../../../../coin-order-schema.md).
-
-`V10__move_folio_to_mutual_fund.sql` moves the order folio to a nullable
-`mutual_fund.folio_number`; ISIN and plan already reside on the fund. Apply after
-V9 in one transaction with fund/order writers stopped. Conflicting distinct folios
-for a fund abort the migration without discarding data. Resolve these explicitly
-before retrying. The updated application requires V10. See the V10 upgrade and
-API contract in [Coin order notes](../../../../../../coin-order-schema.md).
-
-`V11__move_order_metadata_to_transactions.sql` moves status, exchange order ID,
-remarks, tag, and settlement ID from orders to nullable transaction TEXT columns.
-Apply after V10 atomically with order/transaction writers stopped. Unlinked orders
-containing metadata or conflicting values for one transaction abort the migration.
-No transactions are created automatically. The application now requires V11. See
-[transaction metadata and preflight checks](../../../../../../coin-order-schema.md).
-
-`V12__unique_broker_account_per_owner.sql` adds the composite constraint
-`uq_broker_account_name_account_owner` on `(broker_name, account_id, owner_user_id)`.
-Apply after V11. It uses ordinary column comparison and standard UNIQUE semantics:
-different owners may share broker/account values, and NULL owners remain distinct.
-It does not normalize names or identifiers. Duplicate inserts/updates use the
-existing REST data-constraint response (HTTP 400).
-
-Existing duplicate owned accounts cause the migration to fail without deleting
-or merging rows. Resolve those accounts and their fund references explicitly
-before retrying. This read-only check finds conflicting keys:
-
-```sql
-SELECT broker_name, account_id, owner_user_id, COUNT(*) AS account_count
-FROM mutual_fund_broker_account
-WHERE owner_user_id IS NOT NULL
-GROUP BY broker_name, account_id, owner_user_id
-HAVING COUNT(*) > 1;
-```
-
-`V13__relax_mutual_fund_isin_length.sql` removes the exact-length ISIN check and
-widens `mutual_fund.isin` to nullable TEXT. Apply after V12 before deploying the
-updated form/API, which accept `N/A` and other source text without length limits.
-`plan` and `folio_number` are also nullable TEXT columns without validation
-constraints, so `N/A` is a valid stored source value for all three fields.
-Existing values and the optional-field update/clearing behavior are preserved.
+See [Coin schema notes](../../../../../../coin-order-schema.md) for field mapping and
+[Verification](../../../../../../docs/project-understanding/VERIFICATION.md) for which
+upgrade checks ran historically versus the current checkpoint. No database change
+was performed by this documentation reconciliation.
