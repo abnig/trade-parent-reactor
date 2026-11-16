@@ -20,15 +20,9 @@ public class MutualFundBrokerAccountRepositoryImpl implements MutualFundBrokerAc
     }
 
     @Override
-	public List<MutualFundBrokerAccount> findAll(PageRequest pageRequest) {
-        String sql = """
-            SELECT broker_account_id, broker_name, account_id, create_date, update_date
-            FROM mutual_fund_broker_account
-            ORDER BY broker_account_id
-            LIMIT ? OFFSET ?
-            """;
-
-        return jdbcTemplate.query(sql, this::mapRow, pageRequest.size(), pageRequest.offset());
+    public List<MutualFundBrokerAccount> findAll(PageRequest page) {
+        return jdbcTemplate.query("SELECT * FROM mutual_fund_broker_account ORDER BY broker_account_id LIMIT ? OFFSET ?",
+                this::mapRow, page.size(), page.offset());
     }
 
     @Override
@@ -106,4 +100,11 @@ public class MutualFundBrokerAccountRepositoryImpl implements MutualFundBrokerAc
 
         return account;
     }
+
+	@Override
+	public List<MutualFundBrokerAccount> findbyOwnerUserId(Long owner) {
+		return jdbcTemplate.query(
+				"SELECT * FROM mutual_fund_broker_account WHERE owner_user_id = ? ORDER BY broker_account_id",
+				this::mapRow, owner);
+	}
 }

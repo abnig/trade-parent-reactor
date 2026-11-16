@@ -7,22 +7,32 @@ public class MutualFundBrokerAccount {
     private Long id;
     private String brokerName;
     private String accountId;
+    private Long ownerUserId;
     private LocalDateTime createDate;
     private LocalDateTime updateDate;
 
     public MutualFundBrokerAccount() {
     }
 
-    public MutualFundBrokerAccount(Long id, String brokerName, String accountId,
+    public MutualFundBrokerAccount(Long id, String brokerName, String accountId, Long ownerUserId,
                          LocalDateTime createDate, LocalDateTime updateDate) {
         this.id = id;
         this.brokerName = brokerName;
         this.accountId = accountId;
+        this.ownerUserId = ownerUserId;
         this.createDate = createDate;
         this.updateDate = updateDate;
     }
 
-    public Long getId() {
+    public Long getOwnerUserId() {
+		return ownerUserId;
+	}
+
+	public void setOwnerUserId(Long ownerUserId) {
+		this.ownerUserId = ownerUserId;
+	}
+
+	public Long getId() {
         return id;
     }
 

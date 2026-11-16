@@ -8,79 +8,99 @@ import jakarta.validation.constraints.Positive;
 
 public class MutualFund {
 
-    private Long mutualFundId;
+	private Long mutualFundId;
 
-    @NotNull(message = "Broker account ID is required")
-    @Positive(message = "Broker account ID must be positive")
-    private Long brokerAccountId;
+	@NotNull(message = "Broker account ID is required")
+	@Positive(message = "Broker account ID must be positive")
+	private Long brokerAccountId;
 
-    @NotBlank(message = "Mutual fund name is required")
-    private String mutualFundName;
-    private String isin;
-    private String plan;
-    private String folioNumber;
-    private LocalDateTime createDate;
-    private LocalDateTime updateDate;
+	@NotBlank(message = "Mutual fund name is required")
+	private String mutualFundName;
 
-    public MutualFund() {
-    }
+	private String isin;
 
-    public MutualFund(Long mutualFundId, Long brokerAccountId,
-                      String mutualFundName,
-                      LocalDateTime createDate,
-                      LocalDateTime updateDate) {
-        this.mutualFundId = mutualFundId;
-        this.brokerAccountId = brokerAccountId;
-        this.mutualFundName = mutualFundName;
-        this.createDate = createDate;
-        this.updateDate = updateDate;
-    }
+	private String plan;
 
-    public String getIsin() { return isin; }
-    public void setIsin(String isin) { this.isin = isin; }
-    public String getPlan() { return plan; }
-    public void setPlan(String plan) { this.plan = plan; }
+	private String folioNumber;
 
-    public String getFolioNumber() { return folioNumber; }
-    public void setFolioNumber(String folioNumber) { this.folioNumber = folioNumber; }
+	private LocalDateTime createDate;
 
-    public Long getMutualFundId() {
-        return mutualFundId;
-    }
+	private LocalDateTime updateDate;
 
-    public void setMutualFundId(Long mutualFundId) {
-        this.mutualFundId = mutualFundId;
-    }
+	public MutualFund() {
+	}
 
-    public Long getBrokerAccountId() {
-        return brokerAccountId;
-    }
+	public MutualFund(Long mutualFundId, Long brokerAccountId, String mutualFundName, LocalDateTime createDate,
+			LocalDateTime updateDate) {
+		this.mutualFundId = mutualFundId;
+		this.brokerAccountId = brokerAccountId;
+		this.mutualFundName = mutualFundName;
+		this.createDate = createDate;
+		this.updateDate = updateDate;
+	}
 
-    public void setBrokerAccountId(Long brokerAccountId) {
-        this.brokerAccountId = brokerAccountId;
-    }
+	public String getIsin() {
+		return isin;
+	}
 
-    public String getMutualFundName() {
-        return mutualFundName;
-    }
+	public void setIsin(String isin) {
+		this.isin = isin;
+	}
 
-    public void setMutualFundName(String mutualFundName) {
-        this.mutualFundName = mutualFundName;
-    }
+	public String getPlan() {
+		return plan;
+	}
 
-    public LocalDateTime getCreateDate() {
-        return createDate;
-    }
+	public void setPlan(String plan) {
+		this.plan = plan;
+	}
 
-    public void setCreateDate(LocalDateTime createDate) {
-        this.createDate = createDate;
-    }
+	public String getFolioNumber() {
+		return folioNumber;
+	}
 
-    public LocalDateTime getUpdateDate() {
-        return updateDate;
-    }
+	public void setFolioNumber(String folioNumber) {
+		this.folioNumber = folioNumber;
+	}
 
-    public void setUpdateDate(LocalDateTime updateDate) {
-        this.updateDate = updateDate;
-    }
+	public Long getMutualFundId() {
+		return mutualFundId;
+	}
+
+	public void setMutualFundId(Long mutualFundId) {
+		this.mutualFundId = mutualFundId;
+	}
+
+	public Long getBrokerAccountId() {
+		return brokerAccountId;
+	}
+
+	public void setBrokerAccountId(Long brokerAccountId) {
+		this.brokerAccountId = brokerAccountId;
+	}
+
+	public String getMutualFundName() {
+		return mutualFundName;
+	}
+
+	public void setMutualFundName(String mutualFundName) {
+		this.mutualFundName = mutualFundName;
+	}
+
+	public LocalDateTime getCreateDate() {
+		return createDate;
+	}
+
+	public void setCreateDate(LocalDateTime createDate) {
+		this.createDate = createDate;
+	}
+
+	public LocalDateTime getUpdateDate() {
+		return updateDate;
+	}
+
+	public void setUpdateDate(LocalDateTime updateDate) {
+		this.updateDate = updateDate;
+	}
+
 }

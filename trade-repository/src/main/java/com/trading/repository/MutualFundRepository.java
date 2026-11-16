@@ -1,6 +1,7 @@
 package com.trading.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import com.trading.model.MutualFund;
 
@@ -8,6 +9,8 @@ public interface MutualFundRepository {
 
 	// CREATE
 	MutualFund save(MutualFund mutualFund);
+	
+	Optional<MutualFund> findByIsin(String isin);
 
 	// READ - Find all
 	List<MutualFund> findAll(PageRequest pageRequest);

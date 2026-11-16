@@ -19,9 +19,6 @@ public class LedgerFileItemReader extends FlatFileItemReader<LedgerRecord> imple
 
 	private static final Logger logger = LoggerFactory.getLogger(LedgerFileItemReader.class);
 
-	@SuppressWarnings("unused")
-	private LineMapper<LedgerRecord> ledgerLineMapper;
-
 	public LedgerFileItemReader(LineMapper<LedgerRecord> ledgerLineMapper) {
 		super(ledgerLineMapper);
 	}

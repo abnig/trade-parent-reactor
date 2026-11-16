@@ -1,5 +1,9 @@
 # Coin order-history Spring Batch import requirements
 
+> Historical design: the 13 October 2026 user request removes row staging and
+> period/link tables. Their requirements and SQL examples below are superseded
+> by the [current runbook](COIN_BATCH_RUNBOOK.md) and V15 migration.
+
 **Status:** original specification with an implemented Coin job as of 8 October 2026; see the implementation update below.
 
 **Prepared:** 7 October 2026, Asia/Kolkata.

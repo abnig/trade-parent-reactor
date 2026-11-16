@@ -52,6 +52,35 @@ class PaginationControllerTest {
     @MockitoBean private ZerodhaTransactionUploadService uploadService;
 
     @Test
+    void paginatesBrokerAccounts() throws Exception {
+        PageRequest request = new PageRequest(1, 2);
+        var account = new MutualFundBrokerAccount();
+        account.setId(7L);
+        account.setBrokerName("Broker");
+        when(brokerAccountRepository.findAll(request)).thenReturn(List.of(account));
+        when(brokerAccountRepository.count()).thenReturn(3L);
+
+        mockMvc.perform(get("/api/broker-accounts?page=1&size=2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id", is(7)))
+                .andExpect(jsonPath("$.page", is(1)))
+                .andExpect(jsonPath("$.size", is(2)))
+                .andExpect(jsonPath("$.totalElements", is(3)))
+                .andExpect(jsonPath("$.totalPages", is(2)))
+                .andExpect(jsonPath("$.last", is(true)));
+        verify(brokerAccountRepository).findAll(request);
+    }
+
+    @Test
+    void rejectsInvalidBrokerPagination() throws Exception {
+        for (String query : List.of("page=-1", "size=0", "size=101")) {
+            mockMvc.perform(get("/api/broker-accounts?" + query))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error", is("Invalid pagination")));
+        }
+    }
+
+    @Test
     void usesDefaultPaginationAndReturnsMetadata() throws Exception {
         when(mutualFundRepository.findAll(new PageRequest(0, 20)))
                 .thenReturn(List.of(new MutualFund(2L, 1L, "Second", null, null),
@@ -138,21 +167,6 @@ class PaginationControllerTest {
                 .andExpect(jsonPath("$.totalPages", is(2)))
                 .andExpect(jsonPath("$.last", is(true)));
         verify(mutualFundRepository).findByBrokerAccountId(7L, request);
-    }
-
-    @Test
-    void paginatesBrokerAccountsUsingStableRepositoryOrder() throws Exception {
-        PageRequest request = new PageRequest(0, 2);
-        when(brokerAccountRepository.findAll(request)).thenReturn(List.of(
-                new MutualFundBrokerAccount(4L, "A", "1", null, null),
-                new MutualFundBrokerAccount(8L, "B", "2", null, null)));
-        when(brokerAccountRepository.count()).thenReturn(2L);
-
-        mockMvc.perform(get("/api/broker-accounts?size=2"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].id", is(4)))
-                .andExpect(jsonPath("$.content[1].id", is(8)));
-        verify(brokerAccountRepository).findAll(request);
     }
 
     @Test

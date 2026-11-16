@@ -6,6 +6,10 @@ the [requirements](COIN_ORDER_HISTORY_BATCH_REQUIREMENTS.md) retain the original
 source analysis and design history. The REST upload integration was added on 9 October 2026. No application database
 has been migrated or imported as part of development.
 
+Updated 13 October 2026: row staging and period tracking removed; the current
+behavior below supersedes the earlier five-table design. Migration and runtime
+tests use disposable databases only.
+
 ## Behavior
 
 - `VALIDATE` checks the CSV structure and every recoverable record/field in every
@@ -13,23 +17,24 @@ has been migrated or imported as part of development.
   record ordinal, field and error code. Unclosed quotes, resource limits or an
   invalid header prevent interpreting further records in that file.
 - `DRY_RUN` additionally checks schema prerequisites, account ownership, fund
-  matching, order identity, status changes and period conflicts. It creates no
-  managed copies, audit rows, period claims, orders, transactions or Batch metadata.
+  matching, order identity and status changes. It creates no
+  managed copies, file audit records, orders, transactions or Batch metadata.
 - `IMPORT` performs the same preflight over all supplied files, then imports
-  them sequentially. Each file is rechecked while reserving its periods.
+  them sequentially. Each file is rechecked while registering its file audit record.
   Separate files are **not one atomic transaction**; an input conflict with an
   earlier file, concurrent change or later runtime failure can stop the command
   after an earlier file has completed.
 
-The job has three steps: stage immutable source rows, project/upsert orders in
-transactional chunks, and finalize the file/period states. There is no skip policy.
-A failed chunk rolls back and the file retains its period reservation. The
-launcher waits for completion and returns a nonzero process exit code on failure.
+The job has two steps: project/upsert orders in transactional chunks, then finalize
+the file. There is no raw-row staging or period reservation. A failed chunk rolls
+back its order/identity/transaction writes and file counters together. The launcher
+waits for completion and returns a nonzero process exit code on failure.
 
 The parser supports UTF-8/BOM, CRLF/LF/CR, reordered exact headers, quoted commas,
 doubled quotes and multiline cells. Quotes within an unquoted cell remain literal
-so the observed Coin JSON-shaped tags survive. All 16 decoded cells and original
-record bytes/offsets/header are retained. Blanks, whitespace, leading zeros and
+so the observed Coin JSON-shaped tags survive. All 16 decoded cells of the latest order snapshot are retained in the order
+identity; complete original bytes remain in immutable managed files. Row offsets
+are parsed in memory rather than persisted as staging records. Blanks, whitespace, leading zeros and
 text such as `N/A` are preserved; invalid numeric values are reported, never
 rounded or silently replaced. Defaults bound a file to 100 MiB, a record to
 1 MiB/1,000 physical lines, and a file to 100,000 data records.
@@ -55,17 +60,14 @@ existing source order. The order ID stays the same; amount, units, NAV and sourc
 metadata are updated from the completion snapshot. Client, security/name/plan,
 direction, trade date/time and an already supplied folio may not change. Completed
 orders, backward transitions and conflicting snapshots are rejected. Original
-and completion snapshots both remain in the audit tables.
+and completion snapshots both remain in their immutable managed source files.
 
-Period bounds are explicitly supplied, inclusive dates. Every source trade date
-must be within them. PostgreSQL excludes overlaps at owner/fund level, including
-reserved and failed imports. A later file may reuse an **exact, loaded period**
-only for already known unchanged or completing orders; the file must contain at
-least one actual completion. This permits unchanged funds alongside another
-fund's completion. New orders in an already covered fund/period and partial
-overlaps are rejected. An exact byte replay returns the existing result without
-creating a new job. Adjacent non-overlapping periods and other owners/funds are
-independent.
+Period bounds remain explicitly supplied, inclusive dates for source-date validation
+and replay-contract compatibility. Every trade date must be within them. They no
+longer reserve coverage: overlapping exports and new orders in a previously used
+period are accepted. Owner/account order identity still prevents duplicate orders
+and rejects backward or conflicting lifecycle changes. An exact byte replay returns
+the existing result without creating a new job.
 
 ## Explicit posting and date policies
 
@@ -120,42 +122,41 @@ initialization and automatic job launch are disabled in Coin configuration.
 
 ## Database prerequisite and recovery
 
-Apply [V14](../trade-repository/src/main/resources/db/migration/V14__coin_order_history_import.sql)
-only through a separately reviewed schema deployment. It adds `btree_gist` and
-five additive tables: `coin_import_file`, `coin_import_period`,
-`coin_import_file_fund`, `coin_import_row` and `coin_order_identity`.
-The fund join records completion files reusing an earlier reservation; the identity
-table connects source snapshots to the stable order without putting pending
-metadata in portfolio transactions. It changes no existing business table.
+Deploy through [V15](../trade-repository/src/main/resources/db/migration/V15__remove_coin_row_and_period_tracking.sql)
+before running the updated importer. Historical V14 stays unchanged for Flyway
+checksum compatibility. V15 copies latest source fields into `coin_order_identity`
+and committed progress/counts into `coin_import_file`, removes the identity's old
+row reference, and drops the three row/period/link tables. Stop import workers
+before upgrading. Noncontiguous legacy progress aborts the migration transaction.
+Historical per-row audit detail is removed; preserve managed source files.
+The existing `btree_gist` extension is left installed because other objects may use it.
 
 The importer requires the V12 broker uniqueness constraint, V13-shaped portfolio
 schema and durable Batch JDBC tables. The dated live catalog checks found missing
 V12 enforcement and baseline-only Flyway histories. Do not run an unreconciled
-V1–V14 upgrade against those adopted databases; migration history, extension
+V1–V15 upgrade against those adopted databases; migration history, extension
 privileges and schema readiness need deployment review. No live prerequisites
 were changed or freshly inspected during this implementation.
 
 After a normal FAILED execution, fix the external cause and rerun IMPORT with the
 same bytes, owner/account and policy/period/mapping. Stable identifying parameters
 reuse the Batch job instance; completed chunks/steps are not duplicated. Changing
-the saved contract is rejected. Failed periods stay BLOCKED until the same import
-completes. No release, force reload, transaction correction or reversal command is
+the saved contract is rejected. File counters preserve committed results when the same import resumes. No release, force reload, transaction correction or reversal command is
 provided. A killed process left STARTED/UNKNOWN needs reviewed Batch recovery;
 the launcher does not silently abandon a potentially running execution.
 
 Ordinary errors report codes, not raw source cells. Writer failures remove SQL
 exception causes before Spring Batch logs or persists them because PostgreSQL
-constraint errors can contain complete source rows. Managed source/audit storage
+constraint errors can contain complete source rows. Managed source/file-audit storage
 still contains the full original data and needs normal access/retention controls.
 
 ## Verification
 
 Tests use synthetic fixtures and disposable PostgreSQL 16 containers, never
 application database URLs. [CoinImportIntegrationTest](../trade-batch/src/test/java/com/trading/coin/CoinImportIntegrationTest.java)
-exercises the actual V14 Flyway upgrade/revalidation from a prepared V13 portfolio
-schema, JDBC Batch execution, source fidelity, owner isolation, period exclusion,
-concurrency, multi-fund reservation rollback, completion/posting/replay, staging
-and projection rollback, changed-policy/source rejection, standalone modes and
+exercises the V14/V15 Flyway upgrade/revalidation from a prepared V13 portfolio
+schema, JDBC Batch execution, source fidelity, owner isolation, overlapping exports,
+concurrency, all-record validation, completion/posting/replay, and projection rollback, changed-policy/source rejection, standalone modes and
 restart in a new JVM. Parser, validator and component suites cover syntax,
 all-record diagnostics, precision, files, CLI, checkpoints and legacy scan isolation.
 
@@ -218,7 +219,7 @@ staging compatibility. A legacy staged file is not automatically imported later.
 | 202 | Legacy file-only upload staged; no job run |
 | 400 | Missing/invalid options, file, owned account or required multipart part |
 | 401 / 403 | Login required / missing or expired CSRF |
-| 409 | Covered period, conflicting order/replay contract or already-running instance |
+| 409 | Conflicting order/replay contract or already-running instance |
 | 413 / 415 | Upload exceeds size limit / invalid multipart or options content type |
 | 422 | CSV/matching validation failed; `fieldErrors` uses keys such as `record[2].fund` and safe error codes |
 | 429 | Another web import is running in this REST process; retry shortly |
@@ -226,7 +227,7 @@ staging compatibility. A legacy staged file is not automatically imported later.
 | 500 | Import failed after validation; some chunks may have committed; retry identical bytes/options after fixing the cause |
 
 Import admission is limited to one request per REST process, with database locks,
-file identity and period constraints protecting multiple processes/CLI imports.
+file and order identity constraints protecting multiple processes/CLI imports.
 The HTTP request waits for completion. A client/proxy timeout is not evidence of
 rollback; retry identical bytes/options to obtain the persisted result or resume a
 failed instance. Abrupt process death still needs the Batch recovery described above.
@@ -245,7 +246,7 @@ REST configures `COIN_IMPORT_WORK_DIRECTORY` (default
 restart. It uses REST's existing datasource and upload size limit (10 MiB default,
 plus the multipart request limit). Coin validates before writing managed copies.
 The legacy `ZERODHA_TRANSACTIONS_UPLOAD_DIR` remains separate. Neither context
-initializes or migrates Coin tables automatically; V12/V14/history prerequisites
+initializes or migrates Coin tables automatically; V12/V15/history prerequisites
 above still apply before live use.
 
 The necessary integration dependency is `trade-rest` → `trade-batch:coin-library`.
@@ -259,7 +260,7 @@ pool without closing it. Persistence remains in `trade-repository`; CLI artifact
 and the legacy default batch artifact retain their entry points.
 
 Evidence: [upload service](../trade-rest/src/main/java/com/trading/upload/ZerodhaTransactionUploadService.java),
-[runtime bridge](../trade-batch/src/main/java/com/trading/coin/CoinImportRuntime.java),
+[runtime bridge](../trade-batch/src/main/java/com/trading/coin/service/CoinImportRuntime.java),
 [HTTP/PostgreSQL tests](../trade-rest/src/test/java/com/trading/upload/CoinUploadPostgresIntegrationTest.java),
 [upload form](../trade-ui/src/components/CoinUploadForm.jsx),
 and [dated verification](project-understanding/VERIFICATION.md#coin-upload-integration--9-october-2026).

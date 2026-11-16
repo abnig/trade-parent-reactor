@@ -11,122 +11,141 @@ import jakarta.validation.constraints.Positive;
 
 public class MutualFundTxn {
 
-    private Long mutualFundTxnId;
+	private Long mutualFundTxnId;
 
-    @NotNull(message = "Mutual fund ID is required")
-    @Positive(message = "Mutual fund ID must be positive")
-    private Long mutualFundId;
+	@NotNull(message = "Mutual fund ID is required")
+	@Positive(message = "Mutual fund ID must be positive")
+	private Long mutualFundId;
 
-    @NotNull(message = "Amount is required")
-    @DecimalMin(value = "0.0", message = "Amount must not be negative")
-    private BigDecimal amount;
+	@NotNull(message = "Amount is required")
+	@DecimalMin(value = "0.0", message = "Amount must not be negative")
+	private BigDecimal amount;
 
-    @NotNull(message = "Units are required")
-    @DecimalMin(value = "0.0", message = "Units must not be negative")
-    private BigDecimal units;
+	@NotNull(message = "Units are required")
+	@DecimalMin(value = "0.0", message = "Units must not be negative")
+	private BigDecimal units;
 
-    @NotNull(message = "Average price is required")
-    @DecimalMin(value = "0.0", message = "Average price must not be negative")
-    private BigDecimal avgPrice;
-    private String status;
-    private String exchangeOrderId;
-    private String remarks;
-    private String tag;
-    private String settlementId;
-    private LocalDateTime createDate;
-    private LocalDateTime updateDate;
+	@NotNull(message = "Average price is required")
+	@DecimalMin(value = "0.0", message = "Average price must not be negative")
+	private BigDecimal avgPrice;
+	private String status;
+	private String exchangeOrderId;
+	private String remarks;
+	private String tag;
+	private String settlementId;
+	private LocalDateTime createDate;
+	private LocalDateTime updateDate;
 
-    @NotNull(message = "Transaction date is required")
-    private LocalDateTime txnDate;
+	@NotNull(message = "Transaction date is required")
+	private LocalDateTime txnDate;
 
-    @NotNull(message = "Transaction type is required")
-    private TransactionType transactionType;
+	@NotNull(message = "Transaction type is required")
+	private TransactionType transactionType;
 
-    public MutualFundTxn() {
-    }
+	public MutualFundTxn() {
+	}
 
-    public MutualFundTxn(Long mutualFundTxnId,
-                         Long mutualFundId,
-                         BigDecimal amount,
-                         BigDecimal units,
-                         BigDecimal avgPrice,
-                         LocalDateTime createDate,
-                         LocalDateTime updateDate,
-                         LocalDateTime txnDate,
-                         String transactionType) {
-        this.mutualFundTxnId = mutualFundTxnId;
-        this.mutualFundId = mutualFundId;
-        this.amount = amount;
-        this.units = units;
-        this.avgPrice = avgPrice;
-        this.createDate = createDate;
-        this.updateDate = updateDate;
-        this.txnDate = txnDate;
-        this.transactionType = TransactionType.valueOf(transactionType);
-    }
+	public MutualFundTxn(Long mutualFundTxnId, Long mutualFundId, BigDecimal amount, BigDecimal units,
+			BigDecimal avgPrice, LocalDateTime createDate, LocalDateTime updateDate, LocalDateTime txnDate,
+			String transactionType) {
+		this.mutualFundTxnId = mutualFundTxnId;
+		this.mutualFundId = mutualFundId;
+		this.amount = amount;
+		this.units = units;
+		this.avgPrice = avgPrice;
+		this.createDate = createDate;
+		this.updateDate = updateDate;
+		this.txnDate = txnDate;
+		this.transactionType = TransactionType.valueOf(transactionType);
+	}
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+	public String getStatus() {
+		return status;
+	}
 
-    public String getExchangeOrderId() { return exchangeOrderId; }
-    public void setExchangeOrderId(String exchangeOrderId) { this.exchangeOrderId = exchangeOrderId; }
+	public void setStatus(String status) {
+		this.status = status;
+	}
 
-    public String getRemarks() { return remarks; }
-    public void setRemarks(String remarks) { this.remarks = remarks; }
+	public String getExchangeOrderId() {
+		return exchangeOrderId;
+	}
 
-    public String getTag() { return tag; }
-    public void setTag(String tag) { this.tag = tag; }
+	public void setExchangeOrderId(String exchangeOrderId) {
+		this.exchangeOrderId = exchangeOrderId;
+	}
 
-    public String getSettlementId() { return settlementId; }
-    public void setSettlementId(String settlementId) { this.settlementId = settlementId; }
+	public String getRemarks() {
+		return remarks;
+	}
 
-    public Long getMutualFundTxnId() {
-        return mutualFundTxnId;
-    }
+	public void setRemarks(String remarks) {
+		this.remarks = remarks;
+	}
 
-    public void setMutualFundTxnId(Long mutualFundTxnId) {
-        this.mutualFundTxnId = mutualFundTxnId;
-    }
+	public String getTag() {
+		return tag;
+	}
 
-    public Long getMutualFundId() {
-        return mutualFundId;
-    }
+	public void setTag(String tag) {
+		this.tag = tag;
+	}
 
-    public void setMutualFundId(Long mutualFundId) {
-        this.mutualFundId = mutualFundId;
-    }
+	public String getSettlementId() {
+		return settlementId;
+	}
 
-    public BigDecimal getAmount() {
-        return amount;
-    }
+	public void setSettlementId(String settlementId) {
+		this.settlementId = settlementId;
+	}
 
-    public void setAmount(BigDecimal amount) {
-        this.amount = amount;
-    }
+	public Long getMutualFundTxnId() {
+		return mutualFundTxnId;
+	}
 
-    public LocalDateTime getCreateDate() {
-        return createDate;
-    }
+	public void setMutualFundTxnId(Long mutualFundTxnId) {
+		this.mutualFundTxnId = mutualFundTxnId;
+	}
 
-    public void setCreateDate(LocalDateTime createDate) {
-        this.createDate = createDate;
-    }
+	public Long getMutualFundId() {
+		return mutualFundId;
+	}
 
-    public LocalDateTime getUpdateDate() {
-        return updateDate;
-    }
+	public void setMutualFundId(Long mutualFundId) {
+		this.mutualFundId = mutualFundId;
+	}
 
-    public void setUpdateDate(LocalDateTime updateDate) {
-        this.updateDate = updateDate;
-    }
+	public BigDecimal getAmount() {
+		return amount;
+	}
 
-    public LocalDateTime getTxnDate() {
-        return txnDate;
-    }
+	public void setAmount(BigDecimal amount) {
+		this.amount = amount;
+	}
 
-    public void setTxnDate(LocalDateTime txnDate) {
-        this.txnDate = txnDate;
-    }
+	public LocalDateTime getCreateDate() {
+		return createDate;
+	}
+
+	public void setCreateDate(LocalDateTime createDate) {
+		this.createDate = createDate;
+	}
+
+	public LocalDateTime getUpdateDate() {
+		return updateDate;
+	}
+
+	public void setUpdateDate(LocalDateTime updateDate) {
+		this.updateDate = updateDate;
+	}
+
+	public LocalDateTime getTxnDate() {
+		return txnDate;
+	}
+
+	public void setTxnDate(LocalDateTime txnDate) {
+		this.txnDate = txnDate;
+	}
 
 	public BigDecimal getUnits() {
 		return units;

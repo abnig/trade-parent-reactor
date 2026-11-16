@@ -2,101 +2,126 @@ package com.trading.repository.impl;
 
 import java.sql.ResultSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+
 import com.trading.model.MutualFund;
 import com.trading.repository.MutualFundRepository;
 import com.trading.repository.PageRequest;
-import org.springframework.jdbc.core.JdbcTemplate;
 
-/** Owner restriction is applied in SQL, including writes and aggregate counts. */
+/**
+ * Owner restriction is applied in SQL, including writes and aggregate counts.
+ */
 final class OwnedFundRepository extends OwnedPortfolioJdbc implements MutualFundRepository {
-    OwnedFundRepository(JdbcTemplate jdbc, long userId) { super(jdbc, userId); }
+	OwnedFundRepository(JdbcTemplate jdbc, long userId) {
+		super(jdbc, userId);
+	}
 
-    private String scope() { return brokerOwned("broker_account_id"); }
+	private String scope() {
+		return brokerOwned("broker_account_id");
+	}
 
-    @Override
-    public List<MutualFund> findAll(PageRequest page) {
-        return jdbc.query("SELECT * FROM mutual_fund WHERE " + scope() + " ORDER BY mutual_fund_id LIMIT :limit OFFSET :offset",
-                parameters().addValue("limit", page.size()).addValue("offset", page.offset()), this::mapRow);
-    }
+	@Override
+	public List<MutualFund> findAll(PageRequest page) {
+		return jdbc.query(
+				"SELECT * FROM mutual_fund WHERE " + scope() + " ORDER BY mutual_fund_id LIMIT :limit OFFSET :offset",
+				parameters().addValue("limit", page.size()).addValue("offset", page.offset()), this::mapRow);
+	}
 
-    @Override
-    public long count() {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM mutual_fund WHERE " + scope(), parameters(), Long.class);
-    }
+	@Override
+	public long count() {
+		return jdbc.queryForObject("SELECT COUNT(*) FROM mutual_fund WHERE " + scope(), parameters(), Long.class);
+	}
 
-    @Override
-    public MutualFund findById(Long id) {
-        return jdbc.queryForObject("SELECT * FROM mutual_fund WHERE mutual_fund_id = :id AND " + scope(),
-                parameters().addValue("id", id), this::mapRow);
-    }
+	@Override
+	public MutualFund findById(Long id) {
+		return jdbc.queryForObject("SELECT * FROM mutual_fund WHERE mutual_fund_id = :id AND " + scope(),
+				parameters().addValue("id", id), this::mapRow);
+	}
 
-    @Override
-    public MutualFund save(MutualFund item) {
-        long id = insert("INSERT INTO mutual_fund (broker_account_id, mutual_fund_name, isin, plan, folio_number) SELECT :broker_account_id, :mutual_fund_name, NULLIF(:isin, ''), NULLIF(:plan, ''), NULLIF(:folio_number, '') WHERE " + brokerOwned(":broker_account_id"),
-                parameters().addValue("broker_account_id", item.getBrokerAccountId()).addValue("mutual_fund_name", item.getMutualFundName()).addValue("isin", item.getIsin()).addValue("plan", item.getPlan()).addValue("folio_number", item.getFolioNumber()), "mutual_fund_id");
-        item.setMutualFundId(id);
-        return findById(id);
-    }
+	@Override
+	public MutualFund save(MutualFund item) {
+		long id = insert(
+				"INSERT INTO mutual_fund (broker_account_id, mutual_fund_name, isin, plan, folio_number) SELECT :broker_account_id, :mutual_fund_name, NULLIF(:isin, ''), NULLIF(:plan, ''), NULLIF(:folio_number, '') WHERE "
+						+ brokerOwned(":broker_account_id"),
+				parameters().addValue("broker_account_id", item.getBrokerAccountId())
+						.addValue("mutual_fund_name", item.getMutualFundName()).addValue("isin", item.getIsin())
+						.addValue("plan", item.getPlan()).addValue("folio_number", item.getFolioNumber()),
+				"mutual_fund_id");
+		item.setMutualFundId(id);
+		return findById(id);
+	}
 
-    @Override
-    public MutualFund update(MutualFund item) {
-        int rows = jdbc.update("UPDATE mutual_fund SET broker_account_id = :broker_account_id, mutual_fund_name = :mutual_fund_name, isin = CASE WHEN CAST(:isin AS TEXT) IS NULL THEN isin ELSE NULLIF(:isin, '') END, plan = CASE WHEN CAST(:plan AS TEXT) IS NULL THEN plan ELSE NULLIF(:plan, '') END, folio_number = CASE WHEN CAST(:folio_number AS TEXT) IS NULL THEN folio_number ELSE NULLIF(:folio_number, '') END, update_date = CURRENT_TIMESTAMP WHERE mutual_fund_id = :id AND " + scope() + " AND " + brokerOwned(":broker_account_id"),
-                parameters().addValue("broker_account_id", item.getBrokerAccountId()).addValue("mutual_fund_name", item.getMutualFundName()).addValue("isin", item.getIsin()).addValue("plan", item.getPlan()).addValue("folio_number", item.getFolioNumber()).addValue("id", item.getMutualFundId()));
-        requireUpdated(rows);
-        return findById(item.getMutualFundId());
-    }
+	@Override
+	public MutualFund update(MutualFund item) {
+		int rows = jdbc.update(
+				"UPDATE mutual_fund SET broker_account_id = :broker_account_id, mutual_fund_name = :mutual_fund_name, isin = CASE WHEN CAST(:isin AS TEXT) IS NULL THEN isin ELSE NULLIF(:isin, '') END, plan = CASE WHEN CAST(:plan AS TEXT) IS NULL THEN plan ELSE NULLIF(:plan, '') END, folio_number = CASE WHEN CAST(:folio_number AS TEXT) IS NULL THEN folio_number ELSE NULLIF(:folio_number, '') END, update_date = CURRENT_TIMESTAMP WHERE mutual_fund_id = :id AND "
+						+ scope() + " AND " + brokerOwned(":broker_account_id"),
+				parameters().addValue("broker_account_id", item.getBrokerAccountId())
+						.addValue("mutual_fund_name", item.getMutualFundName()).addValue("isin", item.getIsin())
+						.addValue("plan", item.getPlan()).addValue("folio_number", item.getFolioNumber())
+						.addValue("id", item.getMutualFundId()));
+		requireUpdated(rows);
+		return findById(item.getMutualFundId());
+	}
 
-    @Override
-    public boolean deleteById(Long id) {
-        int rows = jdbc.update("DELETE FROM mutual_fund WHERE mutual_fund_id = :id AND " + scope(), parameters().addValue("id", id));
-        return rows > 0;
-    }
+	@Override
+	public boolean deleteById(Long id) {
+		int rows = jdbc.update("DELETE FROM mutual_fund WHERE mutual_fund_id = :id AND " + scope(),
+				parameters().addValue("id", id));
+		return rows > 0;
+	}
 
-    @Override
-    public List<MutualFund> findByBrokerAccountId(Long parentId, PageRequest page) {
-        return jdbc.query("SELECT * FROM mutual_fund WHERE broker_account_id = :parent AND " + scope()
-                + " ORDER BY mutual_fund_id LIMIT :limit OFFSET :offset",
-                parameters().addValue("parent", parentId).addValue("limit", page.size()).addValue("offset", page.offset()), this::mapRow);
-    }
+	@Override
+	public List<MutualFund> findByBrokerAccountId(Long parentId, PageRequest page) {
+		return jdbc.query(
+				"SELECT * FROM mutual_fund WHERE broker_account_id = :parent AND " + scope()
+						+ " ORDER BY mutual_fund_id LIMIT :limit OFFSET :offset",
+				parameters().addValue("parent", parentId).addValue("limit", page.size()).addValue("offset",
+						page.offset()),
+				this::mapRow);
+	}
 
-    @Override
-    public long countByBrokerAccountId(Long parentId) {
-        return jdbc.queryForObject("SELECT COUNT(*) FROM mutual_fund WHERE broker_account_id = :parent AND " + scope(),
-                parameters().addValue("parent", parentId), Long.class);
-    }
+	@Override
+	public long countByBrokerAccountId(Long parentId) {
+		return jdbc.queryForObject("SELECT COUNT(*) FROM mutual_fund WHERE broker_account_id = :parent AND " + scope(),
+				parameters().addValue("parent", parentId), Long.class);
+	}
 
-    private MutualFund mapRow(ResultSet rs, int rowNum)
-            throws java.sql.SQLException {
+	@Override
+	public Optional<MutualFund> findByIsin(String isin) {
+		String sql = "SELECT * FROM mutual_fund WHERE isin = :isin AND " + scope() + " ORDER BY mutual_fund_id LIMIT 1";
 
-        MutualFund mutualFund = new MutualFund();
-        mutualFund.setIsin(rs.getString("isin"));
-        mutualFund.setPlan(rs.getString("plan"));
-        mutualFund.setFolioNumber(rs.getString("folio_number"));
+		try (Stream<MutualFund> stream = jdbc.queryForStream(sql, parameters().addValue("isin", isin), this::mapRow)) {
+			return stream.findFirst();
+		}
+	}
 
-        mutualFund.setMutualFundId(
-                rs.getLong("mutual_fund_id")
-        );
+	/**
+	 * 
+	 * @param rs
+	 * @param rowNum
+	 * @return
+	 * @throws java.sql.SQLException
+	 */
+	private MutualFund mapRow(ResultSet rs, int rowNum) throws java.sql.SQLException {
 
-        mutualFund.setBrokerAccountId(
-                rs.getLong("broker_account_id")
-        );
+		MutualFund mutualFund = new MutualFund();
+		mutualFund.setIsin(rs.getString("isin"));
+		mutualFund.setPlan(rs.getString("plan"));
+		mutualFund.setFolioNumber(rs.getString("folio_number"));
+		mutualFund.setMutualFundId(rs.getLong("mutual_fund_id"));
+		mutualFund.setBrokerAccountId(rs.getLong("broker_account_id"));
+		mutualFund.setMutualFundName(rs.getString("mutual_fund_name"));
+		if (rs.getTimestamp("create_date") != null) {
+			mutualFund.setCreateDate(rs.getTimestamp("create_date").toLocalDateTime());
+		}
 
-        mutualFund.setMutualFundName(
-                rs.getString("mutual_fund_name")
-        );
-
-        if (rs.getTimestamp("create_date") != null) {
-            mutualFund.setCreateDate(
-                    rs.getTimestamp("create_date").toLocalDateTime()
-            );
-        }
-
-        if (rs.getTimestamp("update_date") != null) {
-            mutualFund.setUpdateDate(
-                    rs.getTimestamp("update_date").toLocalDateTime()
-            );
-        }
-
-        return mutualFund;
-    }
+		if (rs.getTimestamp("update_date") != null) {
+			mutualFund.setUpdateDate(rs.getTimestamp("update_date").toLocalDateTime());
+		}
+		return mutualFund;
+	}
 }

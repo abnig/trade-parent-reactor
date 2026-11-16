@@ -2,6 +2,40 @@
 
 [Main report](../PROJECT_UNDERSTANDING.md). **C** unless explicitly marked; commit `70b9f2c2e8621ed396019c6378c1a61b019cf701`. Tables group small related types but account for every first-party backend class/interface in the [file checklist](VERIFICATION.md).
 
+## Build repair and current workspace — 16 November 2026
+
+**C/T:** on `feature/coin-batch-zerodha-upload` at
+`08099d70b58e859c9f552d2950989a3df37cf3c4` plus the pending rewrite, removing the
+factory and all beans from
+[OwnedPortfolioConfiguration](../../trade-rest/src/main/java/com/trading/security/OwnedPortfolioConfiguration.java)
+caused REST to inject the unscoped repository implementations. Seven existing
+ownership tests failed: foreign reads/writes, ownerless inserts, incorrect totals,
+and the missing broker collection route. Restoring the four request-scoped primary
+beans and the non-order factory methods restores the established SQL ownership
+boundary; it does not reintroduce deleted Coin/order components.
+
+[MutualFundBrokerAccountController.findAll](../../trade-rest/src/main/java/com/trading/controller/MutualFundBrokerAccountController.java)
+again returns a paged collection, with SQL pagination in both repository variants.
+[OwnedBrokerRepository.findbyOwnerUserId](../../trade-repository/src/main/java/com/trading/repository/impl/OwnedBrokerRepository.java)
+intersects the supplied owner with its fixed owner instead of replacing the bound
+parameter. The unscoped implementation now binds a positional JDBC parameter.
+[OwnedFundRepository.findByIsin](../../trade-repository/src/main/java/com/trading/repository/impl/OwnedFundRepository.java)
+now supplies both ISIN and owner. Both lookup regressions and HTTP ownership are
+covered on H2 and disposable PostgreSQL by
+[SessionAndOwnershipTest](../../trade-rest/src/test/java/com/trading/security/SessionAndOwnershipTest.java)
+and [PostgresSessionAndOwnershipTest](../../trade-rest/src/test/java/com/trading/security/PostgresSessionAndOwnershipTest.java).
+
+**C/U current Coin boundary:** pre-existing changes removed `CoinUploadConfiguration`,
+`CoinImportRuntime`, the import service/repository, and the manual order repository.
+[MutualFundTxnController.uploadZerodhaTransactions](../../trade-rest/src/main/java/com/trading/controller/MutualFundTxnController.java)
+is a TODO returning null; [ZerodhaTransactionUploadService](../../trade-rest/src/main/java/com/trading/upload/ZerodhaTransactionUploadService.java)
+only has configuration fields and a constructor. No current staging/import
+success is claimed. The October component tables and flow descriptions for those
+deleted types are historical. Completing that rewrite was outside this build fix.
+[RestWorkspaceStartupTest](../../trade-rest/src/test/java/com/trading/startup/RestWorkspaceStartupTest.java)
+now requires the current REST/ownership beans and continues excluding Coin and
+legacy Batch infrastructure when Eclipse exposes the full batch output.
+
 ## REST adapters and orchestration
 
 | Component | Caller → calls | Inputs/outputs, policy, persistence and failures |
@@ -31,7 +65,7 @@
 | `SecurityConfiguration` | BCrypt12; UserDetailsService exact username lookup; public allowlist for csrf/register/login/recovery/reset/reminder/health; other API/actuator authenticated. CSRF enabled by default, saved-request cache disabled, form login204/401, logout204 invalidates session and cookie. No roles-based admin restrictions or login brute-force limiter. [SecurityConfiguration.java:28](../../trade-rest/src/main/java/com/trading/security/SecurityConfiguration.java#L28) |
 | `AccountPrincipal` | Extends Spring User using stored flags/authorities, adds immutable user id and credentialVersion; no user-selected owner. [AccountPrincipal.java:1](../../trade-rest/src/main/java/com/trading/security/AccountPrincipal.java#L1) |
 | `CredentialVersionFilter` | Before AuthorizationFilter, queries recovery account for each existing authenticated principal; missing/ineligible/version mismatch clears context/session and401. Flags/password changes revoke access on next checked request; role mappings are not reloaded into authorities on every request. [CredentialVersionFilter.java:17](../../trade-rest/src/main/java/com/trading/security/CredentialVersionFilter.java#L17) |
-| `OwnedPortfolioConfiguration` | Four @Primary @RequestScope interface proxies, principal-required positive user ID → factory brokers/funds/transactions/values. Order factory exists but no request-scoped order bean/controller. [OwnedPortfolioConfiguration.java:1](../../trade-rest/src/main/java/com/trading/security/OwnedPortfolioConfiguration.java#L1) |
+| `OwnedPortfolioConfiguration` | Four @Primary @RequestScope interface proxies, principal-required positive user ID → factory brokers/funds/transactions/values. Restored and regression-tested on 16 November; the current factory has no order method. [OwnedPortfolioConfiguration.java:1](../../trade-rest/src/main/java/com/trading/security/OwnedPortfolioConfiguration.java#L1) |
 | `GlobalExceptionHandler` | Bean/body/constraint/reference/pagination400, missing row404, integrity400 generic, recovery-specific status, ResponseStatusException status, missing handler404, catch-all500. Logs4xx WARN message/path and5xx ERROR stack. Local auth/profile/recovery handlers and Security filter responses bypass some shared paths. [GlobalExceptionHandler.java:1](../../trade-rest/src/main/java/com/trading/exception/GlobalExceptionHandler.java#L1) |
 | `ApiError`, `InvalidReferenceException`, `InvalidPaginationException`, `ProfileException`, `RecoveryException` | Structured API failure DTO and typed errors. Profile fieldErrors are available on wire but client discards them. Unexpected exception text is hidden in public response; server stack logging may include database details. [ApiError.java:1](../../trade-rest/src/main/java/com/trading/exception/ApiError.java#L1), [ProfileException.java:1](../../trade-rest/src/main/java/com/trading/profile/ProfileException.java#L1), [RecoveryException.java:1](../../trade-rest/src/main/java/com/trading/recovery/RecoveryException.java#L1) |
 | `MutualFundTxnDto`, `MutualFundValueDto` | Record constructors parse/normalize dates; model conversion controls HTTP date precision. Transaction metadata remains raw String. Model annotation changes alone may not change DTO validation. [MutualFundTxnDto.java:1](../../trade-rest/src/main/java/com/trading/dto/MutualFundTxnDto.java#L1), [MutualFundValueDto.java:1](../../trade-rest/src/main/java/com/trading/dto/MutualFundValueDto.java#L1) |
@@ -43,8 +77,8 @@ No `@Scheduled` task, queue consumer, portfolio asynchronous worker, cache manag
 
 | Contract/implementation | Consumers and SQL/data responsibilities | Transaction/ownership specifics |
 |---|---|---|
-| `UserPortfolioRepositoryFactory` / `JdbcUserPortfolioRepositoryFactory` | REST configuration, order tests/future callers; constructs five Owned* objects around JdbcTemplate/userId | Rejects nonpositive user ID. Objects bind one owner; no mutable global owner context. [JdbcUserPortfolioRepositoryFactory.java:1](../../trade-repository/src/main/java/com/trading/repository/impl/JdbcUserPortfolioRepositoryFactory.java#L1) |
-| `OwnedPortfolioJdbc` | Five owned implementations | Shared NamedParameterJdbcTemplate; broker/fund EXISTS scopes, owner param, generated-key insert requiring one row and updates requiring one. Missing/foreign target→EmptyResult. [OwnedPortfolioJdbc.java:1](../../trade-repository/src/main/java/com/trading/repository/impl/OwnedPortfolioJdbc.java#L1) |
+| `UserPortfolioRepositoryFactory` / `JdbcUserPortfolioRepositoryFactory` | REST configuration; constructs four Owned* objects around JdbcTemplate/userId | Rejects nonpositive user ID. Objects bind one owner; no mutable global owner context. Order support was removed in the pending rewrite. [JdbcUserPortfolioRepositoryFactory.java:1](../../trade-repository/src/main/java/com/trading/repository/impl/JdbcUserPortfolioRepositoryFactory.java#L1) |
+| `OwnedPortfolioJdbc` | Four current owned implementations | Shared NamedParameterJdbcTemplate; broker/fund scopes, owner param, generated-key insert requiring one row and updates requiring one. Missing/foreign target→EmptyResult. [OwnedPortfolioJdbc.java:1](../../trade-repository/src/main/java/com/trading/repository/impl/OwnedPortfolioJdbc.java#L1) |
 | `MutualFundBrokerAccountRepository` / `OwnedBrokerRepository` | Active REST interface; list/count/id/CRUD on broker | New owner forced server-side, generated key assigned; update cannot reassign owner. SQL no automatic trimming. [OwnedBrokerRepository.java:1](../../trade-repository/src/main/java/com/trading/repository/impl/OwnedBrokerRepository.java#L1) |
 | `MutualFundRepository` / `OwnedFundRepository` | Active REST CRUD/filter/reference checks | Scope through broker; old AND replacement parent owner checked; optional metadata special null/empty behavior; timestamps refreshed on update. [OwnedFundRepository.java:1](../../trade-repository/src/main/java/com/trading/repository/impl/OwnedFundRepository.java#L1) |
 | `MutualFundTxnRepository` / `OwnedTxnRepository` | REST transaction CRUD, summaries and full history paging | Scope through fund/broker; amount/units raw sum vs net by-fund separate queries; DTO validation outside repository; metadata COALESCE preserves null update. [OwnedTxnRepository.java:1](../../trade-repository/src/main/java/com/trading/repository/impl/OwnedTxnRepository.java#L1) |
@@ -99,14 +133,14 @@ Detailed CSV schemas, concurrency/restart assumptions and all MCP contracts are 
 
 | Component | Responsibility and evidence |
 |---|---|
-| [CoinOrderHistoryBatchApplication](../../trade-batch/src/main/java/com/trading/coin/CoinOrderHistoryBatchApplication.java), [CoinCommandLine](../../trade-batch/src/main/java/com/trading/coin/CoinCommandLine.java) | Explicit modes/policies, all-input parse/DB preflight, synchronous jobs, exit status. No scan of legacy runners. |
-| [CoinCsvReader](../../trade-batch/src/main/java/com/trading/coin/CoinCsvReader.java), [CoinRecordValidator](../../trade-batch/src/main/java/com/trading/coin/CoinRecordValidator.java) | Bounded Coin CSV dialect, exact source evidence, strict decimals/dates, aggregate record diagnostics. |
-| [CoinFileStore](../../trade-batch/src/main/java/com/trading/coin/CoinFileStore.java) | Private content-addressed source copies; detects modified copies and unsafe paths. |
-| [CoinBatchConfiguration](../../trade-batch/src/main/java/com/trading/coin/CoinBatchConfiguration.java) | Explicit JDBC repository/transaction manager, SyncTaskExecutor, job/step scopes, stage/project/finalize. Framework operator is retrieved as JobOperator because it is proxied. |
-| [CoinImportService](../../trade-batch/src/main/java/com/trading/coin/CoinImportService.java), [CoinJobInput](../../trade-batch/src/main/java/com/trading/coin/CoinJobInput.java) | Claim/replay, stable job identity, restart using revalidated managed bytes and persisted policy. |
-| [CoinItemReader](../../trade-batch/src/main/java/com/trading/coin/CoinItemReader.java), [CoinStageWriter](../../trade-batch/src/main/java/com/trading/coin/CoinStageWriter.java), [CoinProjectionWriter](../../trade-batch/src/main/java/com/trading/coin/CoinProjectionWriter.java) | Ordinal checkpoints, transactional raw staging and order projection. Writer exceptions strip potentially private SQL failure details before Batch logging/persistence. |
-| [CoinCompletionListener](../../trade-batch/src/main/java/com/trading/coin/CoinCompletionListener.java) | Marks failed file/period states without releasing failed coverage. |
-| [CoinImportRepository](../../trade-repository/src/main/java/com/trading/repository/CoinImportRepository.java), [JdbcCoinImportRepository](../../trade-repository/src/main/java/com/trading/repository/impl/JdbcCoinImportRepository.java) | Owner/account/fund checks, schema preflight, atomic period reservation, exact order identity, completion update/posting, replay and results. Explicitly registered by Coin; not component scanned into other apps. |
+| [CoinOrderHistoryBatchApplication](../../trade-batch/src/main/java/com/trading/coin/CoinOrderHistoryBatchApplication.java), [CoinCommandLine](../../trade-batch/src/main/java/com/trading/coin/service/CoinCommandLine.java) | Explicit modes/policies, all-input parse/DB preflight, synchronous jobs, exit status. No scan of legacy runners. |
+| [CoinCsvReader](../../trade-batch/src/main/java/com/trading/coin/batch/reader/CoinCsvReader.java), [CoinRecordValidator](../../trade-batch/src/main/java/com/trading/coin/batch/validator/CoinRecordValidator.java) | Bounded Coin CSV dialect, exact source evidence, strict decimals/dates, aggregate record diagnostics. |
+| [CoinFileStore](../../trade-batch/src/main/java/com/trading/coin/service/CoinFileStore.java) | Private content-addressed source copies; detects modified copies and unsafe paths. |
+| [CoinBatchConfiguration](../../trade-batch/src/main/java/com/trading/coin/batch/config/CoinBatchConfiguration.java) | Explicit JDBC repository/transaction manager, SyncTaskExecutor, job/step scopes, project/finalize. Framework operator is retrieved as JobOperator because it is proxied. |
+| [CoinImportService](../../trade-batch/src/main/java/com/trading/coin/service/CoinImportService.java), [CoinJobInput](../../trade-batch/src/main/java/com/trading/coin/service/CoinJobInput.java) | Claim/replay, stable job identity, restart using revalidated managed bytes and persisted policy. |
+| [CoinItemReader](../../trade-batch/src/main/java/com/trading/coin/batch/reader/CoinItemReader.java), [CoinProjectionWriter](../../trade-batch/src/main/java/com/trading/coin/batch/writer/CoinProjectionWriter.java) | Ordinal checkpoints, transactional order projection and file progress. Writer exceptions strip potentially private SQL failure details before Batch logging/persistence. |
+| [CoinCompletionListener](../../trade-batch/src/main/java/com/trading/coin/batch/listener/CoinCompletionListener.java) | Marks failed file state. |
+| [CoinImportRepository](../../trade-repository/src/main/java/com/trading/repository/CoinImportRepository.java), [JdbcCoinImportRepository](../../trade-repository/src/main/java/com/trading/repository/impl/JdbcCoinImportRepository.java) | Owner/account/fund checks, schema preflight, file registration and progress, exact order identity, completion update/posting, replay and results. Explicitly registered by Coin; not component scanned into other apps. |
 
 See the [runbook](../COIN_BATCH_RUNBOOK.md) for behavior/limits. Tests cover each
 component through unit and integrated flows, real PostgreSQL and a fresh JVM.
@@ -117,8 +151,8 @@ safe to run concurrently with each other.
 
 ## Coin upload bridge — 9 October 2026
 
-**C/T:** [CoinUploadConfiguration](../../trade-rest/src/main/java/com/trading/upload/CoinUploadConfiguration.java)
-constructs [CoinImportRuntime](../../trade-batch/src/main/java/com/trading/coin/CoinImportRuntime.java)
+**C/T:** [CoinUploadConfiguration](../../trade-rest/src/main/java/com/trading/coin/upload/CoinUploadConfiguration.java)
+constructs [CoinImportRuntime](../../trade-batch/src/main/java/com/trading/coin/service/CoinImportRuntime.java)
 without opening a Batch context at web startup. The runtime validates bytes,
 creates a private annotation context with explicit Coin configuration, preflights
 all rows, stores immutable bytes and invokes the existing CoinImportService. Its

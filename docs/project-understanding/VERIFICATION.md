@@ -2,6 +2,31 @@
 
 [Main report](../PROJECT_UNDERSTANDING.md). Investigated6–7October2026; commit `70b9f2c2e8621ed396019c6378c1a61b019cf701`, main. The distinctions between **C source**, **T tests**, **R observed runtime/artifact/catalog**, **I inferred consequence**, **U unresolved** apply throughout.
 
+## Build failure repair — 16 November 2026
+
+Publication verification used `feature/coin-batch-zerodha-upload` at
+`08099d70b58e859c9f552d2950989a3df37cf3c4` plus the pending Coin rewrite,
+repository/ownership repairs, V15 migration and tests. The user requested staging,
+committing and pushing these changes, explicitly excluding every `target` directory.
+
+- **T:** `mvn -o verify -Pdev` passed all seven reactor projects: **206 tests
+  (1 batch + 205 REST), zero failures/errors/skips**, including the PostgreSQL
+  ownership regression suite. Packaging and coverage report generation completed.
+  The successful log is `/private/tmp/trade-pre-push-20261116-authorized.log`.
+- The initial sandbox run failed because Docker socket access and Mockito agent
+  attachment were blocked. The authorized rerun above passed; the initial run is
+  not counted as a successful verification.
+- **C:** Git tracks no files beneath a `target` path component. Existing ignore
+  rules cover both root and nested `target` directories; publication also uses
+  explicit staging exclusions. Existing source whitespace warnings from
+  `git diff --check` were retained with the requested code snapshot.
+- **U:** the replacement Coin job and upload endpoint remain unfinished, as
+  described in [Components](COMPONENTS.md#build-repair-and-current-workspace--16-november-2026).
+  Passing tests do not establish Coin import/replay behavior or V15 upgrade
+  correctness in this tree. Frontend checks were not rerun because no frontend
+  files changed. No application database migration, deployment or service restart
+  was performed.
+
 ## Scope and safeguards actually used
 
 Read root AGENTS, tracked first-party sources/configuration/scripts/tests/documents. No nested AGENTS was found. There are254 tracked files at the investigated commit, including107 production Java sources,24 Java test/helper sources,43 frontend files and historical Eclipse metadata. Third-party package-lock entries were inspected as dependency configuration, not treated as first-party source to read exhaustively. Generated Maven/npm reports, jars, node_modules and dist were excluded from source coverage; selected fresh outputs were inspected for verification. Ignored personal exports/secret files were not source inputs or published evidence.
@@ -510,3 +535,46 @@ trace does not represent the rebuilt class. The reproduced workspace collision
 is a confirmed defect, but is not proof of the exact underlying exception in the
 original launch. No live application database was queried/migrated, no legacy
 runner was executed, and no user service was restarted.
+
+## Coin table removal — 13 October 2026
+
+Baseline: `08099d70b58e859c9f552d2950989a3df37cf3c4` on
+`feature/coin-batch-zerodha-upload`, plus this task's uncommitted changes and the
+pre-existing upload-size fallback edit. Tests use synthetic records and disposable
+PostgreSQL containers only. The application databases were not accessed.
+
+- Focused Coin checks passed 49 tests (47 existing/adapted + 2 new migration tests).
+  `CoinRemovalMigrationTest` upgrades a populated V14 schema, checks exact source
+  fields and committed counts, confirms all three tables are absent, validates
+  Flyway and verifies a second migrate is a no-op. A noncontiguous legacy progress
+  case verifies migration rollback retains the original tables/data.
+- `CoinImportIntegrationTest` verifies allowed overlaps/new orders, rejected
+  conflicting/backward snapshots, exact replay, all-record preflight, concurrency,
+  projection rollback, preserved financial/source fields, explicit posting and
+  restart in a new JVM with correct cumulative counts.
+- Focused HTTP/startup checks passed 11 tests after adapting overlap expectations,
+  restoring the schema-error contract and configuring the startup fixture's 10MB
+  limit. Real authenticated multipart HTTP uses disposable PostgreSQL.
+- Frontend: `npm --prefix trade-ui test` passed **119/119**, no skips; production
+  `npm --prefix trade-ui run build` passed. Initial sandbox execution failed only
+  on the test server's loopback bind; the authorized rerun passed.
+
+**T final:** `mvn -o clean verify -Pdev` passed all seven reactor projects at
+19:13 IST: **274 tests (49 batch + 225 REST), zero failures/errors/skips**.
+Packaging and module/aggregate JaCoCo generation passed without class-mismatch
+warnings. The Coin library contains the runtime and excludes the deleted stage
+writer and standalone/legacy entry points. `git diff --check` passed. Logs:
+`/private/tmp/coin-removal-full.log`, `/private/tmp/coin-removal-rest-focused.log`,
+`/private/tmp/coin-removal-ui.log`, `/private/tmp/coin-removal-ui-build.log`.
+
+Initial full-build failures exposed REST's executable-JAR dependency, the stale
+period-conflict assertion, the schema-error message mismatch, and the startup
+fixture's missing explicit limit. The production dependency now consumes
+`coin-library` plus Batch core, keeping Boot Batch auto-configuration excluded.
+The user's 1000MB fallback remains unchanged; without the normally configured
+10MB property it still exceeds the existing 100 MiB constructor guard.
+
+Runtime Java contains no references to the removed tables. Their SQL names remain
+in immutable V14 history, the V15 retirement migration and migration-only tests.
+Historical documentation is marked superseded. No fresh V1–V15 installation,
+live schema upgrade, deployed import or abrupt-kill recovery is claimed.

@@ -18,4 +18,6 @@ public interface MutualFundBrokerAccountRepository {
 
 	int deleteById(Long id);
 
+	List<MutualFundBrokerAccount> findbyOwnerUserId(Long loggedInUser);
+
 }

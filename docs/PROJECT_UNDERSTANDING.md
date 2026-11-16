@@ -7,6 +7,22 @@ and upload integration on `feature/coin-batch-zerodha-upload`. The original inve
 observations retain their 6–7 October scope; current test evidence is recorded in
 the dated [verification entries](project-understanding/VERIFICATION.md#coin-upload-integration--9-october-2026).
 
+**Updated 13 October 2026:** Coin now uses direct projection and file-level
+progress, with no row staging or fund-period reservation. V15 removes the three
+retired tables after preserving lifecycle snapshots and counts. See the current
+[runbook](COIN_BATCH_RUNBOOK.md) and [schema update](project-understanding/DATA_MODEL.md#coin-v15-removal--13-october-2026).
+Earlier dated Coin descriptions below are historical.
+
+**Updated 16 November 2026:** build repairs were investigated on
+`feature/coin-batch-zerodha-upload` at `08099d70b58e859c9f552d2950989a3df37cf3c4`
+with substantial pre-existing uncommitted Coin/repository changes. The current
+working tree has removed the Coin runtime/upload implementation and order
+repository; the upload controller is a TODO and the replacement Coin job remains
+unfinished. October import/replay/restart results do not establish those features
+in this tree. REST's four owner-scoped repository beans and broker pagination were
+restored during this repair. See [current component boundaries](project-understanding/COMPONENTS.md#build-repair-and-current-workspace--16-november-2026)
+and [build verification](project-understanding/VERIFICATION.md#build-failure-repair--16-november-2026).
+
 ## Reading map and evidence labels
 
 | Appendix | Contents |
@@ -45,7 +61,7 @@ The file-level checklist is in [Verification](project-understanding/VERIFICATION
 | `trade-model` | Plain mutual-fund/user/recovery/result objects; `TransactionType`; JPA trade/ledger entities; validation annotations | Data JPA and validation starters; consumed through repository by all three backends | No executable; [pom.xml:1](../trade-model/pom.xml#L1) |
 | `trade-repository` | Repository interfaces, JDBC implementations and row maps, JPA trade/ledger contracts, migration resources | Model, Actuator, PostgreSQL driver; consumed by REST, batch, MCP | Component scan and explicit owner factory; [pom.xml:1](../trade-repository/pom.xml#L1) |
 | `trade-rest` | Session-authenticated portfolio CRUD/analytics; registration, profile, recovery; Coin upload/import and legacy file staging | Repository, MVC, Security, Mail, Flyway; Coin-only batch library and Batch core; UI is HTTP consumer | `com.trading.TradeRestApplication`; [pom.xml](../trade-rest/pom.xml), [TradeRestApplication.java](../trade-rest/src/main/java/com/trading/TradeRestApplication.java) |
-| `trade-batch` | Legacy global trade/ledger imports; isolated owner-scoped Coin CSV job | Repository and Batch; Coin library consumed by REST, no REST calls | Default TradeBatchApplication, separate Coin executable/library; [pom.xml](../trade-batch/pom.xml), [Coin runtime](../trade-batch/src/main/java/com/trading/coin/CoinImportRuntime.java) |
+| `trade-batch` | Legacy global trade/ledger imports; isolated owner-scoped Coin CSV job | Repository and Batch; Coin library consumed by REST, no REST calls | Default TradeBatchApplication, separate Coin executable/library; [pom.xml](../trade-batch/pom.xml), [Coin runtime](../trade-batch/src/main/java/com/trading/coin/service/CoinImportRuntime.java) |
 | `trade-mcp-server` | Four read tools and one symbol resource over SSE/WebFlux | Repository, Spring AI MCP/WebFlux and unused spring-ai-ollama dependency; no REST calls | Actual `com.trading.TradeMcpServerApplication`; POM names a different nonexistent class; [pom.xml:52](../trade-mcp-server/pom.xml#L52) |
 | `trade-coverage` | POM-only aggregate JaCoCo HTML/XML report, no application behavior | Depends on all five Java modules for reporting; not a deployed component | Verify-phase `report-aggregate`; [pom.xml:1](../trade-coverage/pom.xml#L1) |
 | `trade-ui` | Independent React SPA, client calculations, development proxy and production static/proxy server | npm React/ReactDOM; Vite/plugin in development; outside Maven reactor | `index.html` → `src/main.jsx` → `App`; [package.json:1](../trade-ui/package.json#L1), [vite.config.js:1](../trade-ui/vite.config.js#L1) |
@@ -67,7 +83,7 @@ flowchart TD
   UI[trade-ui: independent npm build] -->|HTTP only| REST
 ```
 
-The reactor provides separate REST, batch and MCP executables. REST also embeds the Coin job through its narrow library, using a private Batch context per import. Legacy entry points scan `com.trading` with Coin exclusions; Coin configuration is explicitly registered. Shared JPA entities/repositories can initialize in REST, whose active portfolio access is JDBC. Portfolio controllers call repositories directly. Registration, profile, recovery and upload have their own services; there is no general portfolio service layer. [OwnedPortfolioConfiguration.java:21](../trade-rest/src/main/java/com/trading/security/OwnedPortfolioConfiguration.java#L21), [MutualFundController.java:66](../trade-rest/src/main/java/com/trading/controller/MutualFundController.java#L66), [CoinImportRuntime.java](../trade-batch/src/main/java/com/trading/coin/CoinImportRuntime.java)
+The reactor provides separate REST, batch and MCP executables. REST also embeds the Coin job through its narrow library, using a private Batch context per import. Legacy entry points scan `com.trading` with Coin exclusions; Coin configuration is explicitly registered. Shared JPA entities/repositories can initialize in REST, whose active portfolio access is JDBC. Portfolio controllers call repositories directly. Registration, profile, recovery and upload have their own services; there is no general portfolio service layer. [OwnedPortfolioConfiguration.java:21](../trade-rest/src/main/java/com/trading/security/OwnedPortfolioConfiguration.java#L21), [MutualFundController.java:66](../trade-rest/src/main/java/com/trading/controller/MutualFundController.java#L66), [CoinImportRuntime.java](../trade-batch/src/main/java/com/trading/coin/service/CoinImportRuntime.java)
 
 ## Runtime architecture
 
@@ -94,7 +110,7 @@ flowchart LR
   MCP --> DB
 ```
 
-Coin uploads with explicit options now run the isolated mutual-fund job and may post completed transactions under the selected policy. File-only requests retain staging compatibility. REST/Coin portfolio data is owner-scoped through broker accounts; legacy batch/MCP trade and ledger data is global and has no user FK. [ZerodhaTransactionUploadService.java](../trade-rest/src/main/java/com/trading/upload/ZerodhaTransactionUploadService.java), [CoinImportRuntime.java](../trade-batch/src/main/java/com/trading/coin/CoinImportRuntime.java), [TradeMcpServerTools.java:1](../trade-mcp-server/src/main/java/com/trading/mcp/tools/TradeMcpServerTools.java#L1)
+Coin uploads with explicit options now run the isolated mutual-fund job and may post completed transactions under the selected policy. File-only requests retain staging compatibility. REST/Coin portfolio data is owner-scoped through broker accounts; legacy batch/MCP trade and ledger data is global and has no user FK. [ZerodhaTransactionUploadService.java](../trade-rest/src/main/java/com/trading/upload/ZerodhaTransactionUploadService.java), [CoinImportRuntime.java](../trade-batch/src/main/java/com/trading/coin/service/CoinImportRuntime.java), [TradeMcpServerTools.java:1](../trade-mcp-server/src/main/java/com/trading/mcp/tools/TradeMcpServerTools.java#L1)
 
 Production uses two per-user macOS LaunchAgents with `RunAtLoad` and `KeepAlive`. The UI waits for a successful health response before binding, then proxies API status/body/cookies unchanged. It does **not** continuously suspend itself when REST becomes unhealthy; later upstream connection failures yield 502. REST restart loses in-memory sessions. Production profile reset links default to localhost while deployment instructions direct the browser to127.0.0.1; these are different cookie origins and should be chosen consistently. There is no TLS termination in these templates. [com.trading.trade-rest.plist:1](../deploy/macos/com.trading.trade-rest.plist#L1), [com.trading.trade-ui.plist:1](../deploy/macos/com.trading.trade-ui.plist#L1), [serve-production.mjs:45](../trade-ui/scripts/serve-production.mjs#L45), [SecurityConfiguration.java:1](../trade-rest/src/main/java/com/trading/security/SecurityConfiguration.java#L1)
 

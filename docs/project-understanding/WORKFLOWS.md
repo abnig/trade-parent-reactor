@@ -111,14 +111,21 @@ sequenceDiagram
 
 There is no encompassing CRUD transaction: the diagram's SELECT/mutation/reread are separate database operations. Invalid target404, invalid parent400, duplicate broker under V12/integrity400. Current live databases lack V12 so that duplicate rule is **not runtime-enforced there**. Duplicate transaction/value submissions create additional rows; no deduplication key. Form save has no general pending guard, no optimistic concurrency. Deletion uses DB FKs; linked orders prevent deleting or changing a transaction's fund until links are resolved. No partial cascade cleanup is implemented. List/update clients do not maintain caches beyond component state.
 
-Order workflow is repository-only: an authorized factory caller supplies owner, fund, optional same-fund transaction link and nullable order facts → SQL owner/parent predicates plus same-fund FK link enforcement → INSERT/UPDATE → generated model. Unknown direction or unavailable amount/units/NAV may remain null/text/zero. The stored order is excluded from all portfolio calculations. The baseline had no automatic pending→completed transition, order REST API, UI or parser. The 8 October standalone Coin pipeline below adds parsing and explicit completion upserts; there is still no order REST API/UI. V11 moved descriptive metadata to transactions; unlinked orders can no longer store that metadata, so Coin retains source metadata in its V14 staging and reconciles it explicitly when posting transactions. [OwnedOrderRepository.java:1](../../trade-repository/src/main/java/com/trading/repository/impl/OwnedOrderRepository.java#L1), [coin-order-schema.md:1](../../coin-order-schema.md#L1)
+Order workflow is repository-only: an authorized factory caller supplies owner, fund, optional same-fund transaction link and nullable order facts → SQL owner/parent predicates plus same-fund FK link enforcement → INSERT/UPDATE → generated model. Unknown direction or unavailable amount/units/NAV may remain null/text/zero. The stored order is excluded from all portfolio calculations. The baseline had no automatic pending→completed transition, order REST API, UI or parser. The 8 October standalone Coin pipeline below adds parsing and explicit completion upserts; there is still no order REST API/UI. V11 moved descriptive metadata to transactions; unlinked orders can no longer store that metadata, so Coin retains source metadata in its order identity snapshot and managed file and reconciles it explicitly when posting transactions. [OwnedOrderRepository.java:1](../../trade-repository/src/main/java/com/trading/repository/impl/OwnedOrderRepository.java#L1), [coin-order-schema.md:1](../../coin-order-schema.md#L1)
 
 ## Zerodha upload: import and compatibility paths
 
-**C/T, updated9 October:** select CSV → explicit Coin options form → multipart
+**C, current workspace 16 November 2026:** the pending Coin rewrite has removed
+the runtime and upload methods. `MutualFundTxnController.uploadZerodhaTransactions`
+is a TODO returning null, so neither staging nor import is currently implemented.
+The build repair preserves this unfinished work. See
+[current components](COMPONENTS.md#build-repair-and-current-workspace--16-november-2026).
+The following description and its test evidence apply to the older implementation.
+
+**C/T, historical 9 October:** select CSV → explicit Coin options form → multipart
 file + application/json options + CSRF/session → REST uses session owner → bounded
 CoinImportRuntime → all-record validation/DB preflight → immutable managed copy →
-existing stage/project/finalize job →200 COMPLETED/persisted counts → UI refreshes
+existing project/finalize job →200 COMPLETED/persisted counts → UI refreshes
 rows/totals. File-only API callers retain the original202 UPLOADED staging flow.
 There is no asynchronous queue, polling endpoint or automatic processing of older
 staged files. A timeout may leave a running/completed import, so use the same bytes
@@ -127,7 +134,7 @@ also cover other processes/CLI. See the [runbook](../COIN_BATCH_RUNBOOK.md#rest-
 
 [MutualFundTxnController.uploadZerodhaTransactions](../../trade-rest/src/main/java/com/trading/controller/MutualFundTxnController.java)
 and [ZerodhaTransactionUploadService.importFile/stage](../../trade-rest/src/main/java/com/trading/upload/ZerodhaTransactionUploadService.java)
-preserve route/owner/CSRF and old file-only responses. Validation/period conflicts
+preserve route/owner/CSRF and old file-only responses. Validation/order conflicts
 return safe errors; missing schema returns503. Some chunks can remain after a
 runtime failure; resubmitting the same file resumes its job. V14 is not applied
 automatically. No live service or application DB was changed during development.
@@ -266,28 +273,27 @@ requested implementation and PROCESSING-to-COMPLETE upserts. See the
 
 Explicit arguments → validate all files/records → read-only DB preflight for all
 files → for each accepted file: managed immutable copy → transactional owned
-account/fund locks and atomic file/period reservation → JDBC Batch stage chunks →
-project/upsert chunks → finalize file/period states → report durable counts.
+account/fund locks and file registration → JDBC Batch project/upsert chunks →
+finalize file state → report durable counts.
 VALIDATE ends before opening Spring/DB; DRY_RUN ends without any managed copies or
 DB writes. File processing is sequential, not atomic across the entire input list.
 
 Identifying Batch parameters are owner, account, source system and content hash.
 Parser/policy/period/mappings are frozen in the file contract. Exact replay returns
 the previous result. A FAILED job resumes its committed checkpoint in another JVM;
-failed coverage stays blocked. Changed input/policy cannot create a second load
+file counters retain committed outcomes. Changed input/policy cannot create a second load
 through restart. STARTED/UNKNOWN after an ungraceful kill needs reviewed recovery.
 
-New coverage excludes inclusive owner/fund date overlaps. A completion snapshot
-can reuse an exact LOADED reservation only for existing unchanged/completing
-orders, with at least one completion in the file. The same order ID is updated,
-raw snapshots remain immutable, and a chosen posting policy inserts/links one
-transaction atomically. Other funds' unchanged rows may accompany the update.
-New orders in covered periods, backward/conflicting changes and unresolved manual
-matches are rejected. ORDER_ONLY does not change portfolio transactions/totals.
+**Updated 13 October 2026:** date bounds validate rows but do not reserve coverage.
+Overlapping files and new orders in previously used periods are accepted. The same
+owner/account/exchange ID identifies an order; PROCESSING-to-COMPLETE updates and
+optional posting remain atomic. Source snapshots are compared from identity fields;
+managed files retain original bytes. Backward/conflicting changes and unresolved
+manual matches remain rejected. ORDER_ONLY does not change portfolio totals.
 
-Evidence: [CoinImportService.execute](../../trade-batch/src/main/java/com/trading/coin/CoinImportService.java),
+Evidence: [CoinImportService.execute](../../trade-batch/src/main/java/com/trading/coin/service/CoinImportService.java),
 [JdbcCoinImportRepository.prepare/project](../../trade-repository/src/main/java/com/trading/repository/impl/JdbcCoinImportRepository.java),
-[CoinBatchConfiguration](../../trade-batch/src/main/java/com/trading/coin/CoinBatchConfiguration.java),
+[CoinBatchConfiguration](../../trade-batch/src/main/java/com/trading/coin/batch/config/CoinBatchConfiguration.java),
 [CoinImportIntegrationTest](../../trade-batch/src/test/java/com/trading/coin/CoinImportIntegrationTest.java).
 The 9 October upload integration now invokes this pipeline when options are
 supplied; no application DB import or service restart was performed.

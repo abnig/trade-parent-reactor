@@ -254,3 +254,72 @@ Do not copy credentials, tokens, private records or personal financial data here
   dependencies and the current workspace output. The pasted `main:10` frame
   differs from the rebuilt application's `main:26`; it is not a trace of that
   rebuilt class. No further application code changes or suite reruns were needed.
+
+## 2026-10-13 — Remove Coin row staging and period tracking
+
+- **Baseline/user decision:** `feature/coin-batch-zerodha-upload` at
+  `08099d70b58e859c9f552d2950989a3df37cf3c4`. User requested removing code for
+  `coin_import_file_fund`, `coin_import_period`, and `coin_import_row`, with all
+  tests passing. Preserved the existing uncommitted upload fallback-size change.
+- **C behavior:** `CoinBatchConfiguration` now runs project/finalize only;
+  `CoinStageWriter` and the repository staging API are removed.
+  `JdbcCoinImportRepository.prepare/project` no longer reserves or rejects fund
+  periods. Date bounds still validate input and form part of the replay contract.
+  `coin_order_identity.source_fields` retains the latest 16 decoded cells;
+  file counters and sequential progress commit atomically with domain writes.
+  Complete byte history remains in managed source files. Ownership, exact replay,
+  lifecycle conflict detection, explicit posting and new-JVM restart remain.
+- **C schema:** immutable V14 retained; [V15](../../trade-repository/src/main/resources/db/migration/V15__remove_coin_row_and_period_tracking.sql)
+  backfills identity snapshots and import counts, rejects noncontiguous legacy
+  progress, then removes the three tables and the old identity row reference.
+  No live migration was run. Old import workers must stop before deployment.
+- **C fixes discovered by regression:** REST was depending on the executable
+  batch JAR, hiding `CoinImportRuntime` under BOOT-INF at verify/package time.
+  `trade-rest/pom.xml` now selects the existing Coin library classifier and Batch
+  core, excluding Boot Batch auto-configuration. Removed an unconditional `true`
+  override of schema preflight and restored the tested public schema-error message.
+- **T final:** clean full reactor **274/274**, frontend **119/119**, Vite build
+  and `git diff --check` passed; zero test failures/errors/skips. See
+  [current verification](VERIFICATION.md#coin-table-removal--13-october-2026)
+  for executed results, migration rollback, HTTP import, replay and restart evidence.
+  Initial Docker/sandbox failures were followed by authorized runs after Docker
+  startup. No application DB access, deployment, restart, commit or push occurred.
+- **U retained limitation:** the user's `1000MB` fallback exceeds the service's
+  existing 100 MiB guard when the property is absent. The application explicitly
+  sets `spring.servlet.multipart.max-file-size=10MB`; the standalone startup test
+  now supplies that same value. This task does not change upload-size policy.
+
+## 2026-10-13 — Add CoinRecord for the upcoming job rewrite
+
+- **User request:** create a POJO for the 16 named Coin CSV fields. Added
+  [CoinRecord](../../trade-model/src/main/java/com/trading/model/coin/CoinRecord.java)
+  in `trade-model`, with camelCase properties, public no-argument constructor
+  and getters/setters. Exact decimals use `BigDecimal`, date/time use
+  `LocalDate`/`LocalTime`; source IDs and labels remain strings.
+- **Scope:** baseline remains `08099d70b58e859c9f552d2950989a3df37cf3c4` on
+  `feature/coin-batch-zerodha-upload`. Existing table-removal work and newer
+  externally made Coin class deletions/edits were preserved. No job wiring,
+  persistence mapping, database change or completion of the pending rewrite is
+  implied by this POJO addition.
+- **Verification:** `mvn -o verify -pl trade-model -am` compiled and packaged the
+  model successfully. This module has no tests; getter/setter-only behavior did
+  not warrant additional test dependencies. No full-reactor result is claimed
+  for the newer surrounding workspace changes.
+
+## 2026-11-16 — Publish the pending Coin rewrite and repository repairs
+
+- **Baseline/user decision:** `feature/coin-batch-zerodha-upload` at
+  `08099d70b58e859c9f552d2950989a3df37cf3c4`, with the existing Coin rewrite,
+  model/repository changes, V15, REST repairs, tests and documentation. The user
+  explicitly requested staging, committing and pushing, excluding all `target`
+  directories and their descendants. No application behavior was changed during
+  this publication task.
+- **T:** fresh `mvn -o verify -Pdev` passed **206 tests**, zero failures/errors/skips,
+  and all seven reactor projects after rerunning outside sandbox restrictions on
+  Docker and Mockito. See [verification](VERIFICATION.md#build-failure-repair--16-november-2026).
+- **C/U:** no `target` files are tracked; existing ignore rules and explicit
+  staging exclusions keep generated output out of the commit. Existing whitespace
+  warnings were preserved. The Coin job/upload rewrite remains unfinished; see
+  [current component boundaries](COMPONENTS.md#build-repair-and-current-workspace--16-november-2026).
+  This is a checkpoint of the current work, not a completed import feature or
+  deployment. The Git commit and remote refs provide publication evidence.

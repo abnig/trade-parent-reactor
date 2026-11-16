@@ -1,5 +1,7 @@
 package com.trading.controller;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -15,18 +17,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
-import com.trading.model.result.FundInvestmentSummary;
-import com.trading.dto.PagedResponse;
 import com.trading.dto.MutualFundTxnDto;
+import com.trading.dto.PagedResponse;
 import com.trading.model.MutualFundTxn;
+import com.trading.model.result.FundInvestmentSummary;
 import com.trading.model.result.TransactionSummary;
 import com.trading.repository.MutualFundTxnRepository;
 import com.trading.repository.PageRequest;
 import com.trading.security.AccountPrincipal;
-import com.trading.upload.ZerodhaTransactionUpload;
 import com.trading.upload.ZerodhaTransactionUploadService;
 import com.trading.validation.MutualFundReferenceValidator;
 
@@ -109,18 +108,10 @@ public class MutualFundTxnController {
     }
 
     @PostMapping(value = "/zerodha-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ZerodhaTransactionUpload> uploadZerodhaTransactions(
-            @RequestPart("file") MultipartFile file,
-            @Valid @RequestPart(value = "options", required = false) com.trading.upload.CoinUploadOptions options) {
-        try {
-            if (options != null) return ResponseEntity.ok(uploadService.importFile(currentUser().getId(), file, options));
-            return ResponseEntity.accepted().body(uploadService.stage(currentUser().getId(), file));
-        } catch (IllegalArgumentException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage(), exception);
-        } catch (java.io.IOException exception) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Unable to stage the uploaded file.", exception);
-        }
+    public ResponseEntity<Void> uploadZerodhaTransactions(
+            @RequestPart("file") MultipartFile file) {
+        // TODO: Implement the logic to execute the coin-transaction-upload-job
+    	return null;
     }
 
     private static AccountPrincipal currentUser() {

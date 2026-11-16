@@ -48,7 +48,7 @@ In the matrix, `B/F/T/V` mean broker/fund/transaction/value tables; fund/txn/val
 | Add single → submit → transactions.create | POST `/api/mutual-fund-txns` | create → DTO→validator→save → T/F/B |201 TxnDto → reset/reload data and summaries; required fund/amount/units/avgPrice/date/BUY-or-SELL, optional metadata |
 | Edit row → submit → transactions.update | PUT `/api/mutual-fund-txns/{id}` | update → DTO/path id/validator→UPDATE → T/F/B |200 TxnDto → reload and summaries; ordinary full required body, not PATCH; null metadata preserves |
 | Delete → remove → transactions.remove | DELETE `/api/mutual-fund-txns/{id}` | delete → scoped delete → T/F/B |204 → page/reload/summary; linked order FK400 |
-| CSV select → Coin form → transactions.upload | POST `/api/mutual-fund-txns/zerodha-upload` | Session owner + file/options → isolated Coin job | 9 Oct:200 COMPLETED/counts and row/total refresh; file-only requests retain202 staging. Auth/CSRF,10MB, explicit dates/account/posting; safe field errors |
+| CSV select → Coin form → transactions.upload | POST `/api/mutual-fund-txns/zerodha-upload` | 16 Nov working tree: controller is a TODO returning null; upload service has no staging/import methods | Pending rewrite: UI still expects the historical completion contract. No current upload integration success is claimed; October behavior below is historical |
 | Values overview → MutualFundValues effect → values.latestByFund | GET `/api/analytics/funds`, then GET `/api/mutual-fund-values/mutual-fund/{id}?page=0&size=1` per fund | AnalyticsController + ValueController → two repositories → F/B/V |All or rejection via Promise.all → latest rows and known-value grand total; N+1 unbounded parallel requests |
 | Selected values/paging → effect → values.byFund | GET `/api/mutual-fund-values/mutual-fund/{mutualFundId}` | findByMutualFundId → OwnedValueRepository list/count → V/F/B |200 Page<ValueDto>; full timestamp DESC,valId ASC; foreign empty |
 | No screen → values.all | GET `/api/mutual-fund-values` | findAll → owned list/count → V/F/B |200 Page<ValueDto>, id ASC |
@@ -194,6 +194,10 @@ Single GET helpers for all four CRUD resources, transaction/value unfiltered-all
 
 ## Coin upload contract — 9 October 2026
 
+**Historical:** the uncommitted working tree inspected on 16 November removed
+this implementation; see the [current component boundary](COMPONENTS.md#build-repair-and-current-workspace--16-november-2026).
+The current passing UI tests mock the API and do not establish working backend imports.
+
 The full route and primary upload button remain unchanged. Multipart `file` alone
 retains202 staging. With application/json `options`, the endpoint runs the Coin
 job and returns200 only on completion, preserving receipt fields and adding
@@ -216,3 +220,12 @@ error.fieldErrors without logging file contents or request bodies.
 Tests cover multipart/CSRF/payload contracts, form rendering/options validation,
 all-page selectors and PostgreSQL-backed HTTP execution. Browser event/layout
 validation has not been performed in this task.
+
+
+### Coin table removal — 13 October 2026
+
+The multipart options and response count fields remain compatible. Export bounds
+still validate source dates; they no longer reserve owner/fund coverage or cause
+overlap conflicts. Exact file replay returns original counts from file-level
+counters. Order identity, lifecycle conflicts, ownership, posting choices and
+file-only 202 staging remain. See the [current runbook](../COIN_BATCH_RUNBOOK.md).

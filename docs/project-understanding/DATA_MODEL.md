@@ -550,7 +550,7 @@ migration was written/applied, and the current-schema dictionary/snapshots above
 remain unchanged. No DB verification was performed for this addition.
 
 
-### Coin V14 implementation — 8 October 2026
+### Coin V14 implementation — 8 October 2026 (historical; superseded by V15)
 
 **C/T, not live schema:** the implementation request superseded the historical
 no-migration-written notes above. [V14](../../trade-repository/src/main/resources/db/migration/V14__coin_order_history_import.sql)
@@ -579,3 +579,38 @@ and [CoinImportIntegrationTest](../../trade-batch/src/test/java/com/trading/coin
 are the persistence/constraint evidence. Live V12 and adopted Flyway-history
 reconciliation, production extension privileges and master-data matching remain
 separate deployment work.
+
+
+### Coin V15 removal — 13 October 2026
+
+**C:** [V15](../../trade-repository/src/main/resources/db/migration/V15__remove_coin_row_and_period_tracking.sql)
+drops `coin_import_row`, `coin_import_file_fund` and `coin_import_period` after
+backfilling the two retained tables. V14 is immutable migration history.
+
+| Retained table | Current additions and behavior |
+|---|---|
+| `coin_import_file` | `processed_count`, `inserted_count`, `updated_count`, `unchanged_count`, `posted_count`: nonnegative BIGINT counters committed with order writes. Processed count equals inserted + updated + unchanged and cannot exceed record count. File date bounds remain input validation and replay metadata; they do not reserve fund coverage. |
+| `coin_order_identity` | `source_fields TEXT[] NOT NULL`: exactly 16 non-null source strings in `CoinRow.HEADERS` order; replaces `latest_row_id`. Latest snapshot supports exact identity/lifecycle comparison without row-table joins. |
+
+Complete source history remains in immutable managed files; historical per-row
+SQL audit records are removed. Migration rejects noncontiguous legacy progress
+before dropping tables, with PostgreSQL transactional rollback. Stop imports
+before schema deployment; old workers still require the retired tables.
+`btree_gist` is not dropped because it may serve unrelated database objects.
+
+Evidence: `JdbcCoinImportRepository.project`, `identity`, `complete`, `result`;
+[populated migration tests](../../trade-batch/src/test/java/com/trading/coin/CoinRemovalMigrationTest.java).
+No application database migration or runtime deployment was performed.
+
+### Coin record POJO — 13 October 2026
+
+`com.trading.model.coin.CoinRecord` is a plain mutable JavaBean with a public
+no-argument constructor and getters/setters for all 16 Coin source columns.
+Snake-case CSV names correspond to camelCase Java properties. `amount`, `units`
+and `nav` use `BigDecimal`; `tradeDate` uses `LocalDate`; `orderedAt` uses
+`LocalTime`. The remaining 11 properties use `String`, preserving textual IDs,
+leading zeros, arbitrary source status/mode and remarks/tag content. No JPA,
+serialization or CSV-binding annotations are introduced; mapping is future work.
+It is not yet connected to a reader, job or repository.
+
+Source: [CoinRecord.java](../../trade-model/src/main/java/com/trading/model/coin/CoinRecord.java).

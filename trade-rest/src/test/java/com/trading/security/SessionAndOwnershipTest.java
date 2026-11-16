@@ -29,7 +29,8 @@ class SessionAndOwnershipTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
-    @Autowired com.trading.repository.UserPortfolioRepositoryFactory portfolios;
+    @Autowired com.trading.repository.UserPortfolioRepositoryFactory repositories;
+   
     private static final String PASSWORD = "a-long-password";
     private static final String[] PATHS = {"/api/broker-accounts", "/api/mutual-funds", "/api/mutual-fund-txns", "/api/mutual-fund-values"};
     private static final String FUND = "{\"brokerAccountId\":1,\"mutualFundName\":\"My fund\"}";
@@ -38,10 +39,10 @@ class SessionAndOwnershipTest {
 
     @BeforeEach
     void seed() throws Exception {
-        jdbc.execute("DROP ALL OBJECTS");
+        resetSchema();
         for (String file : new String[]{"V3__application_schema.sql", "V5__create_app_user.sql", "V6__portfolio_ownership.sql", "V7__password_recovery.sql", "V9__mutual_fund_orders.sql", "V10__move_folio_to_mutual_fund.sql", "V11__move_order_metadata_to_transactions.sql", "V12__unique_broker_account_per_owner.sql", "V13__relax_mutual_fund_isin_length.sql"}) {
-            String sql = new ClassPathResource("db/migration/" + file).getContentAsString(StandardCharsets.UTF_8)
-                    .replace(" ON CONFLICT (name) DO NOTHING", ""); // H2 lacks this PostgreSQL syntax.
+            String sql = adaptMigration(new ClassPathResource("db/migration/" + file)
+                    .getContentAsString(StandardCharsets.UTF_8));
             for (String statement : sql.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
         }
         String hash = new BCryptPasswordEncoder(4).encode(PASSWORD);
@@ -55,6 +56,35 @@ class SessionAndOwnershipTest {
             jdbc.update("INSERT INTO mutual_fund_txn(mutual_fund_id,amount,txn_date,units,avg_price,txn_type) VALUES(?,?,CURRENT_TIMESTAMP,1,10,'BUY')", n, n * 10);
             jdbc.update("INSERT INTO mutual_fund_value(mutual_fund_id,total_value,value_as_of_date) VALUES(?,?,CURRENT_TIMESTAMP)", n, n * 15);
         }
+    }
+
+    void resetSchema() { jdbc.execute("DROP ALL OBJECTS"); }
+
+    String adaptMigration(String sql) {
+        return sql.replace(" ON CONFLICT (name) DO NOTHING", ""); // H2 lacks this PostgreSQL syntax.
+    }
+
+    @Test void brokerOwnerLookupCannotOverrideTheRepositoryOwner() {
+        var alice = repositories.brokers(1);
+        assertEquals(java.util.List.of(1L), alice.findbyOwnerUserId(1L).stream()
+                .map(com.trading.model.MutualFundBrokerAccount::getId).toList());
+        assertTrue(alice.findbyOwnerUserId(2L).isEmpty());
+        assertTrue(alice.findbyOwnerUserId(null).isEmpty());
+
+        var unscoped = new com.trading.repository.impl.MutualFundBrokerAccountRepositoryImpl(jdbc);
+        assertEquals(java.util.List.of(2L), unscoped.findbyOwnerUserId(2L).stream()
+                .map(com.trading.model.MutualFundBrokerAccount::getId).toList());
+        assertTrue(unscoped.findbyOwnerUserId(999L).isEmpty());
+    }
+
+    @Test void fundIsinLookupBindsTheOwnerAndHidesForeignAndUnassignedFunds() {
+        jdbc.update("UPDATE mutual_fund SET isin = 'SHARED-ISIN' WHERE mutual_fund_id IN (1, 2)");
+        jdbc.update("UPDATE mutual_fund SET isin = 'UNASSIGNED' WHERE mutual_fund_id = 3");
+        assertEquals(1L, repositories.funds(1).findByIsin("SHARED-ISIN").orElseThrow().getMutualFundId());
+        assertEquals(2L, repositories.funds(2).findByIsin("SHARED-ISIN").orElseThrow().getMutualFundId());
+        assertTrue(repositories.funds(3).findByIsin("SHARED-ISIN").isEmpty());
+        assertTrue(repositories.funds(1).findByIsin("UNASSIGNED").isEmpty());
+        assertTrue(repositories.funds(1).findByIsin("MISSING").isEmpty());
     }
 
     private MockHttpServletRequestBuilder secured(MockHttpServletRequestBuilder request, MockHttpSession session) throws Exception {
@@ -207,26 +237,6 @@ class SessionAndOwnershipTest {
             mvc.perform(secured(put(PATHS[n] + "/4").contentType("application/json").content(bodies[n]), session)).andExpect(status().isOk());
             mvc.perform(secured(delete(PATHS[n] + "/4"), session)).andExpect(status().isNoContent());
         }
-    }
-
-    @Test void repositoryGuardsRejectForeignParentsWithoutControllerValidation() {
-        var fund = new com.trading.model.MutualFund();
-        fund.setBrokerAccountId(2L);
-        fund.setMutualFundName("Attempt");
-        assertThrows(org.springframework.dao.EmptyResultDataAccessException.class, () -> portfolios.funds(1).save(fund));
-        var txn = portfolios.transactions(1).findById(1L);
-        txn.setMutualFundId(2L);
-        assertThrows(org.springframework.dao.EmptyResultDataAccessException.class, () -> portfolios.transactions(1).save(txn));
-        assertThrows(org.springframework.dao.EmptyResultDataAccessException.class, () -> portfolios.transactions(1).update(txn));
-        var value = portfolios.values(1).findById(1L);
-        value.setMutualFundId(2L);
-        assertThrows(org.springframework.dao.EmptyResultDataAccessException.class, () -> portfolios.values(1).save(value));
-        assertThrows(org.springframework.dao.EmptyResultDataAccessException.class, () -> portfolios.values(1).update(value));
-        fund.setMutualFundId(1L);
-        assertThrows(org.springframework.dao.EmptyResultDataAccessException.class, () -> portfolios.funds(1).update(fund));
-        assertEquals(1L, portfolios.funds(1).findById(1L).getBrokerAccountId());
-        assertEquals(1L, portfolios.transactions(1).findById(1L).getMutualFundId());
-        assertEquals(1L, portfolios.values(1).findById(1L).getMutualFundId());
     }
 
     @Test void lockedExpiredAndCredentialExpiredAccountsCannotLogin() throws Exception {

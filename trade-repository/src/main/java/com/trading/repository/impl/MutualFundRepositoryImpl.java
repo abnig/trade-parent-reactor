@@ -2,6 +2,8 @@ package com.trading.repository.impl;
 
 import java.sql.ResultSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -13,188 +15,169 @@ import com.trading.repository.PageRequest;
 @Repository
 public class MutualFundRepositoryImpl implements MutualFundRepository {
 
-    private final JdbcTemplate jdbcTemplate;
+	private final JdbcTemplate jdbcTemplate;
 
-    public MutualFundRepositoryImpl(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
+	public MutualFundRepositoryImpl(JdbcTemplate jdbcTemplate) {
+		this.jdbcTemplate = jdbcTemplate;
+	}
 
-    // CREATE
-    @Override
+	// CREATE
+	@Override
 	public MutualFund save(MutualFund mutualFund) {
 
-        String sql = """
-                INSERT INTO mutual_fund
-                    (broker_account_id, mutual_fund_name, isin, plan, folio_number)
-                VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''))
-                RETURNING mutual_fund_id
-                """;
+		String sql = """
+				INSERT INTO mutual_fund
+				    (broker_account_id, mutual_fund_name, isin, plan, folio_number)
+				VALUES (?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''))
+				RETURNING mutual_fund_id
+				""";
 
-        Long generatedId = jdbcTemplate.queryForObject(
-                sql,
-                Long.class,
-                mutualFund.getBrokerAccountId(),
-                mutualFund.getMutualFundName(),
-                mutualFund.getIsin(),
-                mutualFund.getPlan(),
-                mutualFund.getFolioNumber()
-        );
+		Long generatedId = jdbcTemplate.queryForObject(sql, Long.class, mutualFund.getBrokerAccountId(),
+				mutualFund.getMutualFundName(), mutualFund.getIsin(), mutualFund.getPlan(),
+				mutualFund.getFolioNumber());
 
-        mutualFund.setMutualFundId(generatedId);
+		mutualFund.setMutualFundId(generatedId);
 
-        return findById(generatedId);
-    }
+		return findById(generatedId);
+	}
 
-    // READ - Find all
-    @Override
+	// READ - Find all
+	@Override
 	public List<MutualFund> findAll(PageRequest pageRequest) {
 
-        String sql = """
-                SELECT mutual_fund_id,
-                       broker_account_id,
-                       mutual_fund_name, isin, plan, folio_number,
-                       create_date,
-                       update_date
-                FROM mutual_fund
-                ORDER BY mutual_fund_id
-                LIMIT ? OFFSET ?
-                """;
+		String sql = """
+				SELECT mutual_fund_id,
+				       broker_account_id,
+				       mutual_fund_name, isin, plan, folio_number,
+				       create_date,
+				       update_date
+				FROM mutual_fund
+				ORDER BY mutual_fund_id
+				LIMIT ? OFFSET ?
+				""";
 
-        return jdbcTemplate.query(sql, this::mapRow, pageRequest.size(), pageRequest.offset());
-    }
+		return jdbcTemplate.query(sql, this::mapRow, pageRequest.size(), pageRequest.offset());
+	}
 
-    @Override
-    public long count() {
-        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM mutual_fund", Long.class);
-    }
+	@Override
+	public long count() {
+		return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM mutual_fund", Long.class);
+	}
 
-    // READ - Find by ID
-    @Override
+	// READ - Find by ID
+	@Override
 	public MutualFund findById(Long id) {
 
-        String sql = """
-                SELECT mutual_fund_id,
-                       broker_account_id,
-                       mutual_fund_name, isin, plan, folio_number,
-                       create_date,
-                       update_date
-                FROM mutual_fund
-                WHERE mutual_fund_id = ?
-                """;
+		String sql = """
+				SELECT mutual_fund_id,
+				       broker_account_id,
+				       mutual_fund_name, isin, plan, folio_number,
+				       create_date,
+				       update_date
+				FROM mutual_fund
+				WHERE mutual_fund_id = ?
+				""";
 
-        return jdbcTemplate.queryForObject(
-                sql,
-                this::mapRow,
-                id
-        );
-    }
+		return jdbcTemplate.queryForObject(sql, this::mapRow, id);
+	}
 
-    // READ - Find by Broker Account
-    @Override
+	// READ - Find by Broker Account
+	@Override
 	public List<MutualFund> findByBrokerAccountId(Long brokerAccountId, PageRequest pageRequest) {
 
-        String sql = """
-                SELECT mutual_fund_id,
-                       broker_account_id,
-                       mutual_fund_name, isin, plan, folio_number,
-                       create_date,
-                       update_date
-                FROM mutual_fund
-                WHERE broker_account_id = ?
-                ORDER BY mutual_fund_id
-                LIMIT ? OFFSET ?
-                """;
+		String sql = """
+				SELECT mutual_fund_id,
+				       broker_account_id,
+				       mutual_fund_name, isin, plan, folio_number,
+				       create_date,
+				       update_date
+				FROM mutual_fund
+				WHERE broker_account_id = ?
+				ORDER BY mutual_fund_id
+				LIMIT ? OFFSET ?
+				""";
 
-        return jdbcTemplate.query(
-                sql,
-                this::mapRow,
-                brokerAccountId,
-                pageRequest.size(),
-                pageRequest.offset()
-        );
-    }
+		return jdbcTemplate.query(sql, this::mapRow, brokerAccountId, pageRequest.size(), pageRequest.offset());
+	}
 
-    @Override
-    public long countByBrokerAccountId(Long brokerAccountId) {
-        return jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM mutual_fund WHERE broker_account_id = ?", Long.class, brokerAccountId);
-    }
+	@Override
+	public Optional<MutualFund> findByIsin(String isin) {
 
-    // UPDATE
-    @Override
+		String sql = "SELECT * FROM mutual_fund WHERE isin = ? ORDER BY mutual_fund_id LIMIT 1";
+
+		try (Stream<MutualFund> stream = jdbcTemplate.queryForStream(sql, this::mapRow, isin)) {
+			return stream.findFirst();
+		}
+	}
+
+	@Override
+	public long countByBrokerAccountId(Long brokerAccountId) {
+		return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM mutual_fund WHERE broker_account_id = ?", Long.class,
+				brokerAccountId);
+	}
+
+	// UPDATE
+	@Override
 	public MutualFund update(MutualFund mutualFund) {
 
-        String sql = """
-                UPDATE mutual_fund
-                SET broker_account_id = ?,
-                    mutual_fund_name = ?,
-                    isin = CASE WHEN CAST(? AS TEXT) IS NULL THEN isin ELSE NULLIF(?, '') END,
-                    plan = CASE WHEN CAST(? AS TEXT) IS NULL THEN plan ELSE NULLIF(?, '') END,
-                    folio_number = CASE WHEN CAST(? AS TEXT) IS NULL THEN folio_number ELSE NULLIF(?, '') END,
-                    update_date = CURRENT_TIMESTAMP
-                WHERE mutual_fund_id = ?
-                """;
+		String sql = """
+				UPDATE mutual_fund
+				SET broker_account_id = ?,
+				    mutual_fund_name = ?,
+				    isin = CASE WHEN CAST(? AS TEXT) IS NULL THEN isin ELSE NULLIF(?, '') END,
+				    plan = CASE WHEN CAST(? AS TEXT) IS NULL THEN plan ELSE NULLIF(?, '') END,
+				    folio_number = CASE WHEN CAST(? AS TEXT) IS NULL THEN folio_number ELSE NULLIF(?, '') END,
+				    update_date = CURRENT_TIMESTAMP
+				WHERE mutual_fund_id = ?
+				""";
 
-        jdbcTemplate.update(
-                sql,
-                mutualFund.getBrokerAccountId(),
-                mutualFund.getMutualFundName(),
-                mutualFund.getIsin(),
-                mutualFund.getIsin(),
-                mutualFund.getPlan(),
-                mutualFund.getPlan(),
-                mutualFund.getFolioNumber(),
-                mutualFund.getFolioNumber(),
-                mutualFund.getMutualFundId()
-        );
+		jdbcTemplate.update(sql, mutualFund.getBrokerAccountId(), mutualFund.getMutualFundName(), mutualFund.getIsin(),
+				mutualFund.getIsin(), mutualFund.getPlan(), mutualFund.getPlan(), mutualFund.getFolioNumber(),
+				mutualFund.getFolioNumber(), mutualFund.getMutualFundId());
 
-        return findById(mutualFund.getMutualFundId());
-    }
+		return findById(mutualFund.getMutualFundId());
+	}
 
-    // DELETE
-    @Override
+	// DELETE
+	@Override
 	public boolean deleteById(Long id) {
 
-        String sql = """
-                DELETE FROM mutual_fund
-                WHERE mutual_fund_id = ?
-                """;
+		String sql = """
+				DELETE FROM mutual_fund
+				WHERE mutual_fund_id = ?
+				""";
 
-        return jdbcTemplate.update(sql, id) > 0;
-    }
+		return jdbcTemplate.update(sql, id) > 0;
+	}
 
-    private MutualFund mapRow(ResultSet rs, int rowNum)
-            throws java.sql.SQLException {
+	/**
+	 * 
+	 * @param rs
+	 * @param rowNum
+	 * @return
+	 * @throws java.sql.SQLException
+	 */
+	private MutualFund mapRow(ResultSet rs, int rowNum) throws java.sql.SQLException {
 
-        MutualFund mutualFund = new MutualFund();
-        mutualFund.setIsin(rs.getString("isin"));
-        mutualFund.setPlan(rs.getString("plan"));
-        mutualFund.setFolioNumber(rs.getString("folio_number"));
+		MutualFund mutualFund = new MutualFund();
+		mutualFund.setIsin(rs.getString("isin"));
+		mutualFund.setPlan(rs.getString("plan"));
+		mutualFund.setFolioNumber(rs.getString("folio_number"));
 
-        mutualFund.setMutualFundId(
-                rs.getLong("mutual_fund_id")
-        );
+		mutualFund.setMutualFundId(rs.getLong("mutual_fund_id"));
 
-        mutualFund.setBrokerAccountId(
-                rs.getLong("broker_account_id")
-        );
+		mutualFund.setBrokerAccountId(rs.getLong("broker_account_id"));
 
-        mutualFund.setMutualFundName(
-                rs.getString("mutual_fund_name")
-        );
+		mutualFund.setMutualFundName(rs.getString("mutual_fund_name"));
 
-        if (rs.getTimestamp("create_date") != null) {
-            mutualFund.setCreateDate(
-                    rs.getTimestamp("create_date").toLocalDateTime()
-            );
-        }
+		if (rs.getTimestamp("create_date") != null) {
+			mutualFund.setCreateDate(rs.getTimestamp("create_date").toLocalDateTime());
+		}
 
-        if (rs.getTimestamp("update_date") != null) {
-            mutualFund.setUpdateDate(
-                    rs.getTimestamp("update_date").toLocalDateTime()
-            );
-        }
+		if (rs.getTimestamp("update_date") != null) {
+			mutualFund.setUpdateDate(rs.getTimestamp("update_date").toLocalDateTime());
+		}
 
-        return mutualFund;
-    }
+		return mutualFund;
+	}
 }
